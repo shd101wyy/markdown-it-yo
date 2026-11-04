@@ -11,24 +11,26 @@ pragma(Pragma.AllowUnsafe);
 { byte_substring, str_view } :: import("../common/utils.yo");
 { StateCore } :: import("./state_core.yo");
 
-text_join :: (fn(state: *(StateCore)) -> unit)({
-  (block_tokens : ArrayList(Token)) = state.*.tokens;
+text_join :: (fn(state : *StateCore) -> unit)({
+  block_tokens := &mut state.*.tokens;
   (l : i32) = i32(block_tokens.len());
 
-  (j : i32) = i32(0);
-  while((j < l), {
-    (block_tok : *(Token)) = &(block_tokens(usize(j)));
+  (mut(j) : i32) = i32(0);
+  while(j < l, {
+    (block_tok : *Token) = addr_of(block_tokens(usize(j)));
 
-    if((block_tok.*.type_name == .TT_INLINE), {
-      match(block_tok.*.children,
-        .Some(tokens) => {
+    if(block_tok.*.type_name == .TT_INLINE, {
+      tokens_place := &mut block_tok.*.children;
+      match(
+        tokens_place,
+        .Some(mut(tokens)) => {
           (max : i32) = i32(tokens.len());
 
           // First pass: rename text_special → text
-          (curr : i32) = i32(0);
-          while((curr < max), {
-            (tok : *(Token)) = &(tokens(usize(curr)));
-            if((tok.*.type_name == .TT_TEXT_SPECIAL), {
+          (mut(curr) : i32) = i32(0);
+          while(curr < max, {
+            (tok : *Token) = addr_of(tokens(usize(curr)));
+            if(tok.*.type_name == .TT_TEXT_SPECIAL, {
               tok.*.type_name = .TT_TEXT;
             });
             curr = (curr + i32(1));
@@ -36,20 +38,20 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
 
           // Second pass: merge adjacent text tokens
           curr = i32(0);
-          (last : i32) = i32(0);
-          while((curr < max), {
-            (tok : *(Token)) = &(tokens(usize(curr)));
-            if((((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max))
-                && (&(tokens(usize((curr + i32(1))))).*.type_name == .TT_TEXT)), {
+          (mut(last) : i32) = i32(0);
+          while(curr < max, {
+            (tok : *Token) = addr_of(tokens(usize(curr)));
+            if((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max)
+            && (tokens(usize(curr + i32(1))).type_name == .TT_TEXT), {
               // Collapse two adjacent text nodes
-              (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
-              (merged : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
+              (next_tok : *Token) = addr_of(tokens(usize(curr + i32(1))));
+              (mut(merged) : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
               merged.push_str(next_tok.*.content);
-              next_tok.*.content = str_view(merged);
-              next_tok.*._content_owned = .Some(merged);
+              next_tok.*.content = str_view(&merged);
+              next_tok.*.content_owned = .Some(merged);
             }, {
-              if((curr != last), {
-                &(tokens(usize(last))).* = tok.*;
+              if(curr != last, {
+                tokens.swap(usize(last), usize(curr));
               });
               last = (last + i32(1));
             });
@@ -57,8 +59,8 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
           });
 
           // Truncate to 'last' length
-          if((curr != last), {
-            while((i32(tokens.len()) > last), {
+          if(curr != last, {
+            while(i32(tokens.len()) > last, {
               _ := tokens.pop();
             });
           });

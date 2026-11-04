@@ -9,20 +9,23 @@ pragma(Pragma.AllowUnsafe);
 { Token } :: import("../token.yo");
 { StateCore } :: import("./state_core.yo");
 
-normalize :: (fn(state: *(StateCore)) -> unit)({
-  (src_bytes : ArrayList(u8)) = state.*.src.as_bytes();
+normalize :: (fn(state : *StateCore) -> unit)({
+  (src_bytes : ArrayList(u8)) = state.*.src.to_bytes();
   (len : usize) = src_bytes.len();
 
-  if((len == usize(0)), { return(()); });
+  if(len == usize(0), {
+    return(());
+  });
 
   // Quick check: if no \r (0x0D) and no \0 (0x00), nothing to do
-  (needs_normalize : bool) = false;
-  (scan_i : usize) = usize(0);
-  match(src_bytes.ptr(),
+  (mut(needs_normalize) : bool) = false;
+  (mut(scan_i) : usize) = usize(0);
+  match(
+    src_bytes.ptr(),
     .Some(src_ptr) => {
-      while(((scan_i < len) && !(needs_normalize)), {
+      while((scan_i < len) && !needs_normalize, {
         (b : u8) = (src_ptr.add(scan_i)).*;
-        if(((b == u8(0x0D)) || (b == u8(0x00))), {
+        if((b == u8(0x0D)) || (b == u8(0x00)), {
           needs_normalize = true;
         });
         scan_i = (scan_i + usize(1));
@@ -31,27 +34,30 @@ normalize :: (fn(state: *(StateCore)) -> unit)({
     .None => ()
   );
 
-  if(!(needs_normalize), { return(()); });
+  if(!needs_normalize, {
+    return(());
+  });
 
   // Single-pass: replace \r\n → \n, \r → \n, \0 → U+FFFD (0xEF 0xBF 0xBD in UTF-8)
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
-  (i : usize) = usize(0);
-  (run_start : usize) = usize(0);
+  (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (mut(i) : usize) = usize(0);
+  (mut(run_start) : usize) = usize(0);
 
-  match(src_bytes.ptr(),
+  match(
+    src_bytes.ptr(),
     .Some(src_ptr) => {
-      while((i < len), {
+      while(i < len, {
         (b : u8) = (src_ptr.add(i)).*;
         cond(
           (b == u8(0x0D)) => {
             // Flush run before this \r
-            if((i > run_start), {
-              out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
+            if(i > run_start, {
+              out.extend_from_ptr(src_ptr.add(run_start), i - run_start);
             });
             // Emit \n
             out.push(u8(0x0A));
             // Skip \n after \r if present (CRLF)
-            if((((i + usize(1)) < len) && ((src_ptr.add((i + usize(1)))).* == u8(0x0A))), {
+            if(((i + usize(1)) < len) && ((src_ptr.add(i + usize(1))).* == u8(0x0A)), {
               i = (i + usize(2));
             }, {
               i = (i + usize(1));
@@ -60,8 +66,8 @@ normalize :: (fn(state: *(StateCore)) -> unit)({
           },
           (b == u8(0x00)) => {
             // Flush run before this \0
-            if((i > run_start), {
-              out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
+            if(i > run_start, {
+              out.extend_from_ptr(src_ptr.add(run_start), i - run_start);
             });
             // Emit U+FFFD in UTF-8: 0xEF 0xBF 0xBD
             out.push(u8(0xEF));
@@ -76,8 +82,8 @@ normalize :: (fn(state: *(StateCore)) -> unit)({
         );
       });
       // Flush remaining bytes
-      if((len > run_start), {
-        out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
+      if(len > run_start, {
+        out.extend_from_ptr(src_ptr.add(run_start), len - run_start);
       });
     },
     .None => ()

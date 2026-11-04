@@ -19,6 +19,7 @@ pragma(Pragma.AllowUnsafe);
 { ParserBlock, new_parser_block } :: import("./parser_block.yo");
 { ParserInline, new_parser_inline } :: import("./parser_inline.yo");
 { Env, new_env } :: import("./env.yo");
+{ replace } :: import("std/mem");
 
 // Core rules
 { normalize } :: import("./rules_core/normalize.yo");
@@ -30,6 +31,14 @@ pragma(Pragma.AllowUnsafe);
 { render } :: import("./renderer.yo");
 { str_view } :: import("./common/utils.yo");
 
+// The result of `parse`: the token stream together with the (normalized)
+// source it was parsed from. Token contents are views into `src`, so the two
+// travel together; a String's buffer stays put when the String moves.
+ParsedDocument :: struct(
+  src : String,
+  tokens : ArrayList(Token)
+);
+
 // MarkdownIt — the main parser/renderer class
 MarkdownIt :: struct(
   options : Options,
@@ -40,18 +49,18 @@ MarkdownIt :: struct(
 // Create a new MarkdownIt instance with default options
 new_markdown_it :: (fn() -> MarkdownIt)(
   MarkdownIt(
-    options: default_options(),
-    block: new_parser_block(),
-    inline_parser: new_parser_inline()
+    options : default_options(),
+    block : new_parser_block(),
+    inline_parser : new_parser_inline()
   )
 );
 
 // Create a new MarkdownIt with custom options
-new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
+new_markdown_it_with_options :: (fn(opts : Options) -> MarkdownIt)(
   MarkdownIt(
-    options: opts,
-    block: new_parser_block(),
-    inline_parser: new_parser_inline()
+    options : opts,
+    block : new_parser_block(),
+    inline_parser : new_parser_inline()
   )
 );
 
@@ -60,71 +69,77 @@ new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
 // ============================================================================
 
 // Core block rule: run the block parser on state.src
-_core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool, enable_table: bool) -> unit)({
-  if((state.*.inline_mode), {
+_core_block :: (fn(state : *StateCore, block_parser : &ParserBlock, html_enabled : bool, enable_table : bool) -> unit)({
+  if(state.*.inline_mode, {
     // In inline mode, wrap entire source as a single inline token
-    (token : Token) = Token.new(.TT_INLINE, "", i32(0));
-    token.content = str_view(state.*.src);
-    token._content_owned = .Some(state.*.src);
+    (mut(token) : Token) = Token.new(.TT_INLINE, "", i32(0));
+    // The token owns a copy of the source; its content views that copy (a
+    // String's heap buffer does not move when the String does).
+    owned := state.*.src.clone();
+    token.content = str_view(&owned);
+    token.content_owned = .Some(owned);
     _ := state.*.tokens.push(token);
   }, {
     // Run block parser
-    block_parser.parse(state.*.src, state.*.env, state.*.tokens, html_enabled, enable_table);
+    block_parser.parse(str_view(&state.*.src), state.*.env, &mut state.*.tokens, html_enabled, enable_table);
   });
 });
 
 // Core inline rule: for each 'inline' token, parse its content
-_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabled: bool, enable_strikethrough: bool) -> unit)({
+_core_inline :: (fn(state : *StateCore, inline_parser : &ParserInline, html_enabled : bool, enable_strikethrough : bool) -> unit)({
   (len : i32) = i32(state.*.tokens.len());
-  (i : i32) = i32(0);
+  (mut(i) : i32) = i32(0);
 
-  while((i < len), {
-    (token : *(Token)) = &(state.*.tokens(usize(i)));
-    if((token.*.type_name == .TT_INLINE), {
+  while(i < len, {
+    (token : *Token) = addr_of(state.*.tokens(usize(i)));
+    if(token.*.type_name == .TT_INLINE, {
       // Estimate ~1 inline token per 5 bytes of content
       (content_len : usize) = token.*.content.len();
       (est_children : usize) = ((content_len / usize(5)) + usize(4));
-      (children : ArrayList(Token)) = ArrayList(Token).with_capacity(est_children);
-      inline_parser.parse(token.*.content, state.*.env, children, html_enabled, enable_strikethrough);
+      (mut(children) : ArrayList(Token)) = ArrayList(Token).with_capacity(est_children);
+      inline_parser.parse(token.*.content, state.*.env, &mut children, html_enabled, enable_strikethrough);
       token.*.children = .Some(children);
     });
     i = (i + i32(1));
   });
 });
 
-impl(MarkdownIt,
+impl(
+  MarkdownIt,
   // Parse markdown source into a token stream.
-  parse : (fn(self: Self, src: String) -> ArrayList(Token))({
-    (env : Env) = new_env();
-    (state : StateCore) = new_state_core(src, (&env));
+  parse : (fn(self : &Self, src : String) -> ParsedDocument)({
+    mut(env) := new_env();
+    mut(state) := new_state_core(src, addr_of(env));
 
     // Core pipeline
     // 1. Normalize
-    normalize((&state));
+    normalize(addr_of(state));
     // 2. Block parse
-    _core_block((&state), self.block, self.options.html, self.options.enable_table);
+    _core_block(addr_of(state), &self.block, self.options.html, self.options.enable_table);
     // 3. Inline parse
-    _core_inline((&state), self.inline_parser, self.options.html, self.options.enable_strikethrough);
+    _core_inline(addr_of(state), &self.inline_parser, self.options.html, self.options.enable_strikethrough);
     // 4. Typographer replacements (if enabled)
     if(self.options.typographer, {
-      replacements((&state));
+      replacements(addr_of(state));
     });
     // 5. Smartquotes (if enabled)
     if(self.options.typographer, {
-      smartquotes((&state), self.options.quotes);
+      smartquotes(addr_of(state), &self.options.quotes);
     });
     // 6. Text join
-    text_join((&state));
+    text_join(addr_of(state));
 
-    state.tokens
+    ParsedDocument(
+      tokens : replace(&mut state.tokens, ArrayList(Token).new()),
+      src : replace(&mut state.src, String.new())
+    )
   }),
-
   // Render markdown source to HTML string.
-  render_src : (fn(self: Self, src: String) -> String)({
+  render_src : (fn(self : &Self, src : String) -> String)({
     (src_len : usize) = src.len();
-    (tokens : ArrayList(Token)) = self.parse(src);
-    render(tokens, (&self.options), src_len)
+    mut(doc) := self.parse(src);
+    render(&mut doc.tokens, &self.options, src_len)
   })
 );
 
-export(MarkdownIt, new_markdown_it, new_markdown_it_with_options);
+export(MarkdownIt, ParsedDocument, new_markdown_it, new_markdown_it_with_options);

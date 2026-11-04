@@ -10,43 +10,43 @@ pragma(Pragma.AllowUnsafe);
 { byte_substring, str_view } :: import("../common/utils.yo");
 { StateInline } :: import("./state_inline.yo");
 
-fragments_join :: (fn(state: *(StateInline)) -> unit)({
-  (level : i32) = i32(0);
-  (tokens : ArrayList(Token)) = state.*.tokens;
+fragments_join :: (fn(state : *StateInline) -> unit)({
+  (mut(level) : i32) = i32(0);
+  tokens := &mut state.*.tokens;
   (max : i32) = i32(tokens.len());
 
-  (curr : i32) = i32(0);
-  (last : i32) = i32(0);
+  (mut(curr) : i32) = i32(0);
+  (mut(last) : i32) = i32(0);
 
-  while((curr < max), {
-    (tok : *(Token)) = &(tokens(usize(curr)));
+  while(curr < max, {
+    (tok : *Token) = addr_of(tokens(usize(curr)));
 
     // re-calculate levels
-    if((tok.*.nesting < i32(0)), {
+    if(tok.*.nesting < i32(0), {
       level = (level - i32(1));
     });
     tok.*.level = level;
-    if((tok.*.nesting > i32(0)), {
+    if(tok.*.nesting > i32(0), {
       level = (level + i32(1));
     });
 
-    if(((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max)), {
-      (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
-      if((next_tok.*.type_name == .TT_TEXT), {
+    if((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max), {
+      (next_tok : *Token) = addr_of(tokens(usize(curr + i32(1))));
+      if(next_tok.*.type_name == .TT_TEXT, {
         // collapse two adjacent text nodes: next.content = tok.content + next.content
-        (combined : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
+        (mut(combined) : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
         combined.push_str(next_tok.*.content);
-        next_tok.*.content = str_view(combined);
-        next_tok.*._content_owned = .Some(combined);
+        next_tok.*.content = str_view(&combined);
+        next_tok.*.content_owned = .Some(combined);
       }, {
-        if((curr != last), {
-          &(tokens(usize(last))).* = tok.*;
+        if(curr != last, {
+          tokens.swap(usize(last), usize(curr));
         });
         last = (last + i32(1));
       });
     }, {
-      if((curr != last), {
-        &(tokens(usize(last))).* = tok.*;
+      if(curr != last, {
+        tokens.swap(usize(last), usize(curr));
       });
       last = (last + i32(1));
     });
@@ -55,8 +55,8 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
   });
 
   // Truncate tokens to `last` length
-  if((curr != last), {
-    while((i32(tokens.len()) > last), {
+  if(curr != last, {
+    while(i32(tokens.len()) > last, {
       _ := tokens.pop();
     });
   });

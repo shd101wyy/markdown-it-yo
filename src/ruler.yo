@@ -25,6 +25,7 @@ RuleEntry :: (fn(comptime(F) : Type) -> comptime(Type))(
     alt : ArrayList(String)
   )
 );
+derive(generic(F : Type), where(F <: Clone), RuleEntry(F), Clone);
 
 // Ruler — manages an ordered list of named rules.
 // F is the function type for rules (e.g., fn(state: *(StateBlock), ...) -> bool)
@@ -35,79 +36,57 @@ Ruler :: (fn(comptime(F) : Type) -> comptime(Type))(
   )
 );
 
-// Insert an element into an ArrayList at the given index by rebuilding the list.
-// ArrayList does not have a built-in insert method.
-_arrayListInsert :: (fn(generic(T : Type), list: ArrayList(T), index: usize, item: T) -> unit)({
-  (new_list : ArrayList(T)) = ArrayList(T).new();
-  (i : usize) = usize(0);
-  (len : usize) = list.len();
-  while((i < len), {
-    if((i == index), {
-      new_list.push(item);
-    });
-    new_list.push(list.get(i).unwrap());
-    i = (i + usize(1));
-  });
-  // If inserting at the end
-  if((index == len), {
-    new_list.push(item);
-  });
-  // Clear original and copy back
-  list.clear();
-  i = usize(0);
-  while((i < new_list.len()), {
-    list.push(new_list.get(i).unwrap());
-    i = (i + usize(1));
-  });
+// Insert an element into an ArrayList at the given index.
+_arrayListInsert :: (fn(generic(T : Type), list : &mut ArrayList(T), index : usize, item : T) -> unit)({
+  _ := list.insert(index, item);
 });
 
-impl(generic(F : Type), Ruler(F),
-
+impl(
+  generic(F : Type),
+  Ruler(F),
   new : (fn() -> Self)(
     Self(
-      _rules: ArrayList(RuleEntry(F)).new(),
-      _cache: .None
+      _rules : ArrayList(RuleEntry(F)).new(),
+      _cache : .None
     )
   ),
-
   // Find rule index by name
-  _find : (fn(self: *(Self), name: String) -> i32)({
-    (i : i32) = i32(0);
+  _find : (fn(self : *Self, name : &String) -> i32)({
+    (mut(i) : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while((i < len), {
-      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
-      if((rule.name == name), {
+    while(i < len, {
+      (rule : RuleEntry(F)) = self.*._rules.get_cloned(usize(i)).unwrap();
+      if(rule.name == name.*, {
         return(i);
       });
       i = (i + i32(1));
     });
     i32(-1)
   }),
-
   // Build rules lookup cache
-  _compile : (fn(self: *(Self)) -> unit)({
-    (chains : ArrayList(String)) = ArrayList(String).new();
+  _compile : (fn(self : *Self) -> unit)({
+    (mut(chains) : ArrayList(String)) = ArrayList(String).new();
     chains.push(String.new());
 
     // Collect unique chain names from enabled rules
-    (i : i32) = i32(0);
+    (mut(i) : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while((i < len), {
-      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
+    while(i < len, {
+      (rule : RuleEntry(F)) = self.*._rules.get_cloned(usize(i)).unwrap();
       if(rule.enabled, {
-        (j : i32) = i32(0);
+        (mut(j) : i32) = i32(0);
         (alt_len : i32) = i32(rule.alt.len());
-        while((j < alt_len), {
-          (alt_name : String) = rule.alt.get(usize(j)).unwrap();
-          (found : bool) = false;
-          (k : i32) = i32(0);
-          while((k < i32(chains.len())), {
-            if((chains.get(usize(k)).unwrap() == alt_name), {
+        while(j < alt_len, {
+          (alt_name : String) = rule.alt.get_cloned(usize(j)).unwrap();
+          (mut(found) : bool) = false;
+          (mut(k) : i32) = i32(0);
+          while(k < i32(chains.len()), {
+            if(chains.get_cloned(usize(k)).unwrap() == alt_name, {
               found = true;
             });
             k = (k + i32(1));
           });
-          if(!(found), {
+          if(!found, {
             chains.push(alt_name);
           });
           j = (j + i32(1));
@@ -117,23 +96,23 @@ impl(generic(F : Type), Ruler(F),
     });
 
     // Build cache for each chain
-    (cache : HashMap(String, ArrayList(F))) = HashMap(String, ArrayList(F)).new();
+    (mut(cache) : HashMap(String, ArrayList(F))) = HashMap(String, ArrayList(F)).new();
 
-    (ci : i32) = i32(0);
+    (mut(ci) : i32) = i32(0);
     (chains_len : i32) = i32(chains.len());
-    while((ci < chains_len), {
-      (chain : String) = chains.get(usize(ci)).unwrap();
-      (chain_rules : ArrayList(F)) = ArrayList(F).new();
+    while(ci < chains_len, {
+      (chain : String) = chains.get_cloned(usize(ci)).unwrap();
+      (mut(chain_rules) : ArrayList(F)) = ArrayList(F).new();
 
-      (ri : i32) = i32(0);
-      while((ri < len), {
-        (rule : RuleEntry(F)) = self.*._rules.get(usize(ri)).unwrap();
+      (mut(ri) : i32) = i32(0);
+      while(ri < len, {
+        (rule : RuleEntry(F)) = self.*._rules.get_cloned(usize(ri)).unwrap();
         if(rule.enabled, {
-          if((chain.len() > usize(0)), {
-            (found_alt : bool) = false;
-            (ai : i32) = i32(0);
-            while((ai < i32(rule.alt.len())), {
-              if((rule.alt.get(usize(ai)).unwrap() == chain), {
+          if(chain.len() > usize(0), {
+            (mut(found_alt) : bool) = false;
+            (mut(ai) : i32) = i32(0);
+            while(ai < i32(rule.alt.len()), {
+              if(rule.alt.get_cloned(usize(ai)).unwrap() == chain, {
                 found_alt = true;
               });
               ai = (ai + i32(1));
@@ -154,83 +133,82 @@ impl(generic(F : Type), Ruler(F),
 
     self.*._cache = .Some(cache);
   }),
-
   // Replace rule by name with new function & options.
-  at : (fn(self: *(Self), name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    (index : i32) = self._find(name);
-    assert((index != i32(-1)), "Parser rule not found");
+  at : (fn(self : *Self, name : String, rule_fn : F, alt : ArrayList(String)) -> unit)({
+    (index : i32) = self._find(&name);
+    assert(index != i32(-1), "Parser rule not found");
 
-    (old_rule : RuleEntry(F)) = self.*._rules.get(usize(index)).unwrap();
-    &(self.*._rules(usize(index))).* = RuleEntry(F)(
-      name: name,
-      enabled: old_rule.enabled,
-      rule_fn: rule_fn,
-      alt: alt
+    (old_rule : RuleEntry(F)) = self.*._rules.get_cloned(usize(index)).unwrap();
+    self.*._rules(usize(index)) = RuleEntry(F)(
+      name : name,
+      enabled : old_rule.enabled,
+      rule_fn : rule_fn,
+      alt : alt
     );
     self.*._cache = .None;
   }),
-
   // Add new rule before one with given name.
-  before : (fn(self: *(Self), before_name: String, rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    (index : i32) = self._find(before_name);
-    assert((index != i32(-1)), "Parser rule not found");
+  before : (fn(self : *Self, before_name : String, rule_name : String, rule_fn : F, alt : ArrayList(String)) -> unit)({
+    (index : i32) = self._find(&before_name);
+    assert(index != i32(-1), "Parser rule not found");
 
-    _arrayListInsert(self.*._rules, usize(index), RuleEntry(F)(
-      name: rule_name,
-      enabled: true,
-      rule_fn: rule_fn,
-      alt: alt
-    ));
+    _arrayListInsert(
+      &mut self.*._rules,
+      usize(index),
+      RuleEntry(F)(
+        name : rule_name,
+        enabled : true,
+        rule_fn : rule_fn,
+        alt : alt
+      )
+    );
     self.*._cache = .None;
   }),
-
   // Add new rule after one with given name.
-  after : (fn(self: *(Self), after_name: String, rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    (index : i32) = self._find(after_name);
-    assert((index != i32(-1)), "Parser rule not found");
+  after : (fn(self : *Self, after_name : String, rule_name : String, rule_fn : F, alt : ArrayList(String)) -> unit)({
+    (index : i32) = self._find(&after_name);
+    assert(index != i32(-1), "Parser rule not found");
 
-    _arrayListInsert(self.*._rules, usize((index + i32(1))), RuleEntry(F)(
-      name: rule_name,
-      enabled: true,
-      rule_fn: rule_fn,
-      alt: alt
-    ));
+    _arrayListInsert(
+      &mut self.*._rules,
+      usize(index + i32(1)),
+      RuleEntry(F)(
+        name : rule_name,
+        enabled : true,
+        rule_fn : rule_fn,
+        alt : alt
+      )
+    );
     self.*._cache = .None;
   }),
-
   // Push new rule to the end of chain.
-  push : (fn(self: *(Self), rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    self.*._rules.push(RuleEntry(F)(
-      name: rule_name,
-      enabled: true,
-      rule_fn: rule_fn,
-      alt: alt
-    ));
+  push : (fn(self : *Self, rule_name : String, rule_fn : F, alt : ArrayList(String)) -> unit)({
+    self.*._rules.push(
+      RuleEntry(F)(
+        name : rule_name,
+        enabled : true,
+        rule_fn : rule_fn,
+        alt : alt
+      )
+    );
     self.*._cache = .None;
   }),
-
   // Enable rules with given names.
-  enable : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> ArrayList(String))({
-    (result : ArrayList(String)) = ArrayList(String).new();
+  enable : (fn(self : *Self, list : ArrayList(String), ignore_invalid : bool) -> ArrayList(String))({
+    (mut(result) : ArrayList(String)) = ArrayList(String).new();
 
-    (i : i32) = i32(0);
+    (mut(i) : i32) = i32(0);
     (len : i32) = i32(list.len());
-    while((i < len), {
-      (name : String) = list.get(usize(i)).unwrap();
-      (idx : i32) = self._find(name);
+    while(i < len, {
+      (name : String) = list.get_cloned(usize(i)).unwrap();
+      (idx : i32) = self._find(&name);
 
-      if((idx < i32(0)), {
-        if(!(ignore_invalid), {
+      if(idx < i32(0), {
+        if(!ignore_invalid, {
           assert(false, "Rules manager: invalid rule name");
         });
       }, {
-        (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
-        &(self.*._rules(usize(idx))).* = RuleEntry(F)(
-          name: rule.name,
-          enabled: true,
-          rule_fn: rule.rule_fn,
-          alt: rule.alt
-        );
+        self.*._rules(usize(idx)).enabled = true;
         result.push(name);
       });
 
@@ -240,48 +218,34 @@ impl(generic(F : Type), Ruler(F),
     self.*._cache = .None;
     result
   }),
-
   // Enable rules with given names, and disable everything else.
-  enable_only : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> unit)({
-    (i : i32) = i32(0);
+  enable_only : (fn(self : *Self, list : ArrayList(String), ignore_invalid : bool) -> unit)({
+    (mut(i) : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while((i < len), {
-      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
-      &(self.*._rules(usize(i))).* = RuleEntry(F)(
-        name: rule.name,
-        enabled: false,
-        rule_fn: rule.rule_fn,
-        alt: rule.alt
-      );
+    while(i < len, {
+      self.*._rules(usize(i)).enabled = false;
       i = (i + i32(1));
     });
 
     self.enable(list, ignore_invalid);
     ();
   }),
-
   // Disable rules with given names.
-  disable : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> ArrayList(String))({
-    (result : ArrayList(String)) = ArrayList(String).new();
+  disable : (fn(self : *Self, list : ArrayList(String), ignore_invalid : bool) -> ArrayList(String))({
+    (mut(result) : ArrayList(String)) = ArrayList(String).new();
 
-    (i : i32) = i32(0);
+    (mut(i) : i32) = i32(0);
     (len : i32) = i32(list.len());
-    while((i < len), {
-      (name : String) = list.get(usize(i)).unwrap();
-      (idx : i32) = self._find(name);
+    while(i < len, {
+      (name : String) = list.get_cloned(usize(i)).unwrap();
+      (idx : i32) = self._find(&name);
 
-      if((idx < i32(0)), {
-        if(!(ignore_invalid), {
+      if(idx < i32(0), {
+        if(!ignore_invalid, {
           assert(false, "Rules manager: invalid rule name");
         });
       }, {
-        (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
-        &(self.*._rules(usize(idx))).* = RuleEntry(F)(
-          name: rule.name,
-          enabled: false,
-          rule_fn: rule.rule_fn,
-          alt: rule.alt
-        );
+        self.*._rules(usize(idx)).enabled = false;
         result.push(name);
       });
 
@@ -291,18 +255,20 @@ impl(generic(F : Type), Ruler(F),
     self.*._cache = .None;
     result
   }),
-
   // Return array of active functions for given chain name.
-  get_rules : (fn(self: *(Self), chain_name: String) -> ArrayList(F))({
-    match(self.*._cache,
+  get_rules : (fn(self : *Self, chain_name : String) -> ArrayList(F))({
+    match(
+      &self.*._cache,
       .None => {
         self._compile();
       },
       .Some(_) => ()
     );
 
-    match(self.*._cache,
-      .Some(cache) => match(cache.get(chain_name),
+    match(
+      &self.*._cache,
+      .Some(cache) => match(
+        cache.get_cloned(&chain_name),
         .Some(rules) => rules,
         .None => ArrayList(F).new()
       ),

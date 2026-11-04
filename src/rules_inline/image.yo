@@ -14,49 +14,56 @@ pragma(Pragma.AllowUnsafe);
 { LinkDestResult, parse_link_destination } :: import("../helpers/parse_link_destination.yo");
 { LinkTitleResult, parse_link_title } :: import("../helpers/parse_link_title.yo");
 { Reference, Env } :: import("../env.yo");
+{ replace } :: import("std/mem");
 
-image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
-  (pos : i32) = state.*.pos;
+image_rule :: (fn(state : *StateInline, silent : bool) -> bool)({
+  (mut(pos) : i32) = state.*.pos;
   (max : i32) = state.*.pos_max;
 
   // Must start with '!'
-  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x21)), {
+  if(i32(state.*.src_bytes.bytes(usize(pos))) != i32(0x21), {
     return(false);
   });
   // Followed by '['
-  if(((pos + i32(1)) >= max), { return(false); });
-  if((i32(state.*._src_bytes.bytes(usize((pos + i32(1))))) != i32(0x5B)), {
+  if((pos + i32(1)) >= max, {
+    return(false);
+  });
+  if(i32(state.*.src_bytes.bytes(usize(pos + i32(1)))) != i32(0x5B), {
     return(false);
   });
 
   (label_start : i32) = (pos + i32(2));
-  (label_end : i32) = parse_link_label(state.*._src_bytes, (pos + i32(1)), max, false);
+  (label_end : i32) = parse_link_label(state.*.src_bytes, pos + i32(1), max, false);
 
-  if((label_end < i32(0)), { return(false); });
+  if(label_end < i32(0), {
+    return(false);
+  });
 
-  (href : String) = String.new();
-  (title : String) = String.new();
+  (mut(href) : String) = String.new();
+  (mut(title) : String) = String.new();
   pos = (label_end + i32(1));
 
-  (parse_reference : bool) = true;
+  (mut(parse_reference) : bool) = true;
 
   // Try inline link: ![alt](url "title")
-  if(((pos < max) && (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x28))), {
+  if((pos < max) && (i32(state.*.src_bytes.bytes(usize(pos))) == i32(0x28)), {
     parse_reference = false;
     pos = (pos + i32(1));
 
     // Skip spaces
-    while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+    while((pos < max) && (is_space(i32(state.*.src_bytes.bytes(usize(pos)))) || (i32(state.*.src_bytes.bytes(usize(pos))) == i32(0x0A))), {
       pos = (pos + i32(1));
     });
-    if((pos >= max), { return(false); });
+    if(pos >= max, {
+      return(false);
+    });
 
     // Parse link destination
-    (start : i32) = pos;
+    (mut(start) : i32) = pos;
     (dest_result : LinkDestResult) = parse_link_destination(state.*.src, pos, max);
     if(dest_result.ok, {
-      (normalized : String) = normalize_link(dest_result.str);
-      if(validate_link(normalized), {
+      (normalized : String) = normalize_link(dest_result.str.clone());
+      if(validate_link(&normalized), {
         href = normalized;
         pos = dest_result.pos;
       });
@@ -64,22 +71,22 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Skip spaces
     start = pos;
-    while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+    while((pos < max) && (is_space(i32(state.*.src_bytes.bytes(usize(pos)))) || (i32(state.*.src_bytes.bytes(usize(pos))) == i32(0x0A))), {
       pos = (pos + i32(1));
     });
 
     // Parse title
     (title_result : LinkTitleResult) = parse_link_title(state.*.src, pos, max, .None);
-    if((((pos < max) && (start != pos)) && title_result.ok), {
-      title = title_result.str;
+    if((pos < max) && (start != pos) && title_result.ok, {
+      title = title_result.str.clone();
       pos = title_result.pos;
 
-      while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+      while((pos < max) && (is_space(i32(state.*.src_bytes.bytes(usize(pos)))) || (i32(state.*.src_bytes.bytes(usize(pos))) == i32(0x0A))), {
         pos = (pos + i32(1));
       });
     });
 
-    if(((pos >= max) || (i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x29))), {
+    if((pos >= max) || (i32(state.*.src_bytes.bytes(usize(pos))) != i32(0x29)), {
       parse_reference = true;
     }, {
       pos = (pos + i32(1));
@@ -88,14 +95,14 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Reference image: ![alt][ref] or ![alt][] or ![alt]
   if(parse_reference, {
-    (ref_label : String) = String.new();
+    (mut(ref_label) : String) = String.new();
 
-    if(((pos < max) && (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x5B))), {
+    if((pos < max) && (i32(state.*.src_bytes.bytes(usize(pos))) == i32(0x5B)), {
       // ![alt][ref] — full form or ![alt][] — collapsed form
       (ref_start : i32) = (pos + i32(1));
-      (ref_end : i32) = parse_link_label(state.*._src_bytes, pos, max, false);
-      if((ref_end >= i32(0)), {
-        ref_label = byte_substring(state.*._src_bytes, ref_start, ref_end);
+      (ref_end : i32) = parse_link_label(state.*.src_bytes, pos, max, false);
+      if(ref_end >= i32(0), {
+        ref_label = byte_substring(state.*.src_bytes, ref_start, ref_end);
         pos = (ref_end + i32(1));
       }, {
         pos = (label_end + i32(1));
@@ -106,19 +113,22 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
 
     // If no explicit ref label (collapsed/shortcut), use the alt text
-    if((ref_label.len() == usize(0)), {
-      ref_label = byte_substring(state.*._src_bytes, label_start, label_end);
+    if(ref_label.len() == usize(0), {
+      ref_label = byte_substring(state.*.src_bytes, label_start, label_end);
     });
 
     (label : String) = normalize_reference(ref_label);
-    if((label.len() == usize(0)), { return(false); });
+    if(label.len() == usize(0), {
+      return(false);
+    });
 
-    (env : *(Env)) = state.*.env;
-    (ref_opt : Option(Reference)) = env.*.references.get(label);
-    match(ref_opt,
-      .Some(r) => {
-        href = r.href;
-        title = r.title;
+    (env : *Env) = state.*.env;
+    (ref_opt : Option(Reference)) = env.*.references.get_cloned(&label);
+    match(
+      ref_opt,
+      .Some(Reference(href : r_href, title : r_title)) => {
+        href = r_href;
+        title = r_title;
       },
       .None => {
         return(false);
@@ -126,26 +136,25 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     );
   });
 
-  if(!(silent), {
-    (content : String) = byte_substring(state.*._src_bytes, label_start, label_end);
+  if(!silent, {
+    (content : String) = byte_substring(state.*.src_bytes, label_start, label_end);
 
     // Parse alt text content through the full inline parser to get child tokens
-    (children_tokens : ArrayList(Token)) = ArrayList(Token).new();
-    (sub_state : StateInline) = new_state_inline(str_view(content), state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
-    state.*._parse_fn((&sub_state));
+    mut(sub_state) := new_state_inline(str_view(&content), state.*.env, ArrayList(Token).new(), state.*.html_enabled, state.*.enable_strikethrough, state.*.tokenize_fn, state.*.parse_fn);
+    state.*.parse_fn(addr_of(sub_state));
 
-    (token : Token) = state_push(state, .TT_IMAGE, "img", i32(0));
-    (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
-    _ := attrs.push(StringPair(name: `src`, value: href));
-    _ := attrs.push(StringPair(name: `alt`, value: String.new()));
-    if((title.len() > usize(0)), {
-      _ := attrs.push(StringPair(name: `title`, value: title));
+    (mut(token) : Token) = state_push(state, .TT_IMAGE, "img", i32(0));
+    (mut(attrs) : ArrayList(StringPair)) = ArrayList(StringPair).new();
+    _ := attrs.push(StringPair(name : `src`, value : href));
+    _ := attrs.push(StringPair(name : `alt`, value : String.new()));
+    if(title.len() > usize(0), {
+      _ := attrs.push(StringPair(name : `title`, value : title));
     });
     token.attrs = .Some(attrs);
-    token.children = .Some(children_tokens);
-    token.content = str_view(content);
-    token._content_owned = .Some(content);
-    &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token;
+    token.children = .Some(replace(&mut sub_state.tokens, ArrayList(Token).new()));
+    token.content = str_view(&content);
+    token.content_owned = .Some(content);
+    state.*.tokens(usize(i32(state.*.tokens.len()) - i32(1))) = token;
   });
 
   state.*.pos = pos;

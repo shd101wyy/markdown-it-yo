@@ -8,7 +8,7 @@ import("std/string");
 { ArrayList } :: import("std/collections/array_list");
 { Token } :: import("./token.yo");
 { StateInline, new_state_inline } :: import("./rules_inline/state_inline.yo");
-{ flush_pending } :: import("./rules_inline/inline_helpers.yo");
+{ flush_pending, close_open_delimiters } :: import("./rules_inline/inline_helpers.yo");
 { Env } :: import("./env.yo");
 
 // Inline tokenize rules
@@ -27,36 +27,41 @@ import("std/string");
 // Post-processing rules
 { link_pairs } :: import("./rules_inline/balance_pairs.yo");
 { fragments_join } :: import("./rules_inline/fragments_join.yo");
+{ replace } :: import("std/mem");
 
-// Standalone inline tokenize function — stored in StateInline._tokenize_fn
+// Standalone inline tokenize function — stored in StateInline.tokenize_fn
 // to allow recursive calls from link/image rules without circular imports.
-_inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
-  while((state.*.pos < state.*.pos_max), {
+_inline_tokenize :: (fn(state : *StateInline) -> unit)({
+  while(state.*.pos < state.*.pos_max, {
     // First-byte dispatch: skip rules that can't match the current byte
-    (ch : i32) = i32(state.*._src_bytes.bytes(usize(state.*.pos)));
-    (ok : bool) = cond(
-      (ch == i32(0x0A)) => newline(state, false),                          // \n
-      (ch == i32(0x5C)) => escape_rule(state, false),                      // backslash
-      (ch == i32(0x60)) => backtick(state, false),                         // backtick
-      (ch == i32(0x7E)) => cond(                                           // ~
+    (ch : i32) = i32(state.*.src_bytes.bytes(usize(state.*.pos)));
+    (mut(ok) : bool) = cond(
+      (ch == i32(0x0A)) => newline(state, false), // \n
+      (ch == i32(0x5C)) => escape_rule(state, false), // backslash
+      (ch == i32(0x60)) => backtick(state, false), // backtick
+      (ch == i32(0x7E)) => cond(
+        // ~
         state.*.enable_strikethrough => strikethrough_tokenize(state, false),
         true => false
       ),
       ((ch == i32(0x2A)) || (ch == i32(0x5F))) => emphasis_tokenize(state, false), // * _
-      (ch == i32(0x5B)) => link_rule(state, false),                        // [
-      (ch == i32(0x21)) => image_rule(state, false),                       // !
-      (ch == i32(0x3C)) => cond(                                           // <
+      (ch == i32(0x5B)) => link_rule(state, false), // [
+      (ch == i32(0x21)) => image_rule(state, false), // !
+      (ch == i32(0x3C)) => cond(
+        // <
         autolink(state, false) => true,
         true => html_inline(state, false)
       ),
-      (ch == i32(0x26)) => entity(state, false),                           // &
+      (ch == i32(0x26)) => entity(state, false), // &
       true => false
     );
     // If dispatch didn't match, try text rule (scans non-special chars)
-    if(!(ok), { ok = text(state, false); });
-    if(!(ok), {
+    if(!ok, {
+      ok = text(state, false);
+    });
+    if(!ok, {
       // No rule matched — consume character as pending text
-      if((state.*.pending_start < i32(0)), {
+      if(state.*.pending_start < i32(0), {
         state.*.pending_start = state.*.pos;
       });
       state.*.pos = (state.*.pos + i32(1));
@@ -64,17 +69,20 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
   });
 
   // Flush remaining pending text
-  if((state.*.pending_start >= i32(0)), {
+  if(state.*.pending_start >= i32(0), {
     flush_pending(state);
   });
 });
 
 // Full inline parse on a state: tokenize + post-processing.
-// Stored in StateInline._parse_fn for use by image rule (alt text children).
-_inline_parse_state :: (fn(state: *(StateInline)) -> unit)({
+// Stored in StateInline.parse_fn for use by image rule (alt text children).
+_inline_parse_state :: (fn(state : *StateInline) -> unit)({
   _inline_tokenize(state);
+  close_open_delimiters(state);
   link_pairs(state);
-  if(state.*.enable_strikethrough, { strikethrough_post_process(state); });
+  if(state.*.enable_strikethrough, {
+    strikethrough_post_process(state);
+  });
   emphasis_post_process(state);
   fragments_join(state);
 });
@@ -85,14 +93,16 @@ ParserInline :: struct(
 );
 
 new_parser_inline :: (fn() -> ParserInline)(
-  ParserInline(_initialized: true)
+  ParserInline(_initialized : true)
 );
 
-impl(ParserInline,
+impl(
+  ParserInline,
   // Parse inline content: tokenize then run post-processing rules.
-  parse : (fn(self: Self, src: str, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool) -> unit)({
-    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled, enable_strikethrough, _inline_tokenize, _inline_parse_state);
-    _inline_parse_state((&state));
+  parse : (fn(self : &Self, src : str, env : *Env, out_tokens : &mut ArrayList(Token), html_enabled : bool, enable_strikethrough : bool) -> unit)({
+    mut(state) := new_state_inline(src, env, replace(out_tokens, ArrayList(Token).new()), html_enabled, enable_strikethrough, _inline_tokenize, _inline_parse_state);
+    _inline_parse_state(addr_of(state));
+    out_tokens.* = replace(&mut state.tokens, ArrayList(Token).new());
   })
 );
 

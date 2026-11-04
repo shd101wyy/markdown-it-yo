@@ -16,20 +16,22 @@ pragma(Pragma.AllowUnsafe);
 _link_open_re := Regex.new_with_flags(`^<a[>\\s]`, `i`).unwrap();
 _link_close_re := Regex.new_with_flags(`^</a\\s*>`, `i`).unwrap();
 
-_is_letter :: (fn(ch: i32) -> bool)({
+_is_letter :: (fn(ch : i32) -> bool)({
   (lc : i32) = (ch | i32(0x20));
-  ((lc >= i32(0x61)) && (lc <= i32(0x7A)))
+  (lc >= i32(0x61)) && (lc <= i32(0x7A))
 });
 
-_is_link_open :: (fn(s: String) -> bool)(
-  match(_link_open_re.find(s.to_lowercase()),
+_is_link_open :: (fn(s : &String) -> bool)(
+  match(
+    _link_open_re.find(s.to_lowercase()),
     .Some(_) => true,
     .None => false
   )
 );
 
-_is_link_close :: (fn(s: String) -> bool)(
-  match(_link_close_re.find(s.to_lowercase()),
+_is_link_close :: (fn(s : &String) -> bool)(
+  match(
+    _link_close_re.find(s.to_lowercase()),
     .Some(_) => true,
     .None => false
   )
@@ -38,37 +40,42 @@ _is_link_close :: (fn(s: String) -> bool)(
 // Cached HTML tag regex (compiled once at startup)
 _html_tag_re := Regex.new(html_re().HTML_TAG_RE_STR).unwrap();
 
-html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
+html_inline :: (fn(state : *StateInline, silent : bool) -> bool)({
   // HTML option must be enabled
-  if(!(state.*.html_enabled), { return(false); });
+  if(!(state.*.html_enabled), {
+    return(false);
+  });
 
   (pos : i32) = state.*.pos;
   (max : i32) = state.*.pos_max;
 
   // Must start with '<'
-  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x3C)), {
+  if(i32(state.*.src_bytes.bytes(usize(pos))) != i32(0x3C), {
     return(false);
   });
 
-  if(((pos + i32(2)) >= max), { return(false); });
+  if((pos + i32(2)) >= max, {
+    return(false);
+  });
 
   // Quick fail on second char
-  (ch : i32) = i32(state.*._src_bytes.bytes(usize((pos + i32(1)))));
-  if((((ch != i32(0x21)) && (ch != i32(0x3F))) && ((ch != i32(0x2F)) && !(_is_letter(ch)))), {
+  (ch : i32) = i32(state.*.src_bytes.bytes(usize(pos + i32(1))));
+  if((ch != i32(0x21)) && (ch != i32(0x3F)) && ((ch != i32(0x2F)) && !_is_letter(ch)), {
     return(false);
   });
 
   // Try to match HTML tag regex
-  (remaining : String) = byte_substring(state.*._src_bytes, pos, max);
+  (remaining : String) = byte_substring(state.*.src_bytes, pos, max);
 
-  match(_html_tag_re.find(remaining),
+  match(
+    _html_tag_re.find(&remaining),
     .Some(m) => {
-      if(!(silent), {
-        (tok : Token) = state_push(state, .TT_HTML_INLINE, "", i32(0));
-        (match_val : String) = m.value();
-        tok.content = str_view(match_val);
-        tok._content_owned = .Some(match_val);
-        &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = tok;
+      if(!silent, {
+        (mut(tok) : Token) = state_push(state, .TT_HTML_INLINE, "", i32(0));
+        (match_val : String) = m.value().clone();
+        tok.content = str_view(&match_val);
+        tok.content_owned = .Some(match_val);
+        state.*.tokens(usize(i32(state.*.tokens.len()) - i32(1))) = tok;
 
         if(_is_link_open(m.value()), {
           state.*.link_level = (state.*.link_level + i32(1));
@@ -77,7 +84,7 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
           state.*.link_level = (state.*.link_level - i32(1));
         });
       });
-      state.*.pos = (pos + i32(m.value().as_bytes().len()));
+      state.*.pos = (pos + i32(m.value().len()));
       true
     },
     .None => false

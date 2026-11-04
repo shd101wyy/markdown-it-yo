@@ -19,16 +19,17 @@ PARENT_TABLE :: i32(5);
 
 // Block parser state
 StateBlock :: struct(
-  src : String,
-  env : *(Env),
+  // A view of the core state's source: tokens keep views into it, so the
+  // buffer must outlive the block parser (it belongs to StateCore).
+  src : str,
+  env : *Env,
   tokens : ArrayList(Token),
-
   // Line marker arrays (precomputed during construction)
-  b_marks : ArrayList(i32),   // line begin offsets
-  e_marks : ArrayList(i32),   // line end offsets
-  t_shift : ArrayList(i32),   // offset of first non-space char(tabs not expanded)
-  s_count : ArrayList(i32),   // indents per line(tabs expanded)
-  bs_count : ArrayList(i32),  // blockquote shift compensation
+  b_marks : ArrayList(i32), // line begin offsets
+  e_marks : ArrayList(i32), // line end offsets
+  t_shift : ArrayList(i32), // offset of first non-space char(tabs not expanded)
+  s_count : ArrayList(i32), // indents per line(tabs expanded)
+  bs_count : ArrayList(i32), // blockquote shift compensation
 
   // Block parser variables
   blk_indent : i32,
@@ -39,32 +40,29 @@ StateBlock :: struct(
   list_indent : i32,
   parent_type : i32,
   level : i32,
-
   // Options pushed down from MarkdownIt
   html_enabled : bool,
   enable_table : bool,
-
   // Cached bytes for fast access
-  _src_bytes : str,
-
+  src_bytes : str,
   // Function pointer for recursive block tokenization (set by parser_block).
-  _tokenize_fn : (fn(state: *(Self), start: i32, end: i32) -> unit)
+  tokenize_fn : (fn(state : *Self, start : i32, end : i32) -> unit)
 );
 
 // Function pointer type for recursive block tokenization
-BlockTokenizeFn :: (fn(state: *(StateBlock), start: i32, end: i32) -> unit);
+BlockTokenizeFn :: (fn(state : *StateBlock, start : i32, end : i32) -> unit);
 
 // Push a block-level token via pointer, correctly maintaining nesting level.
 // Use this instead of the push_token method which has a by-value self bug.
-block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
-  (token : Token) = tok;
+block_push_token :: (fn(state : *StateBlock, tok : Token) -> unit)({
+  (mut(token) : Token) = tok;
   token.block = true;
 
-  if((token.nesting < i32(0)), {
+  if(token.nesting < i32(0), {
     state.*.level = (state.*.level - i32(1));
   });
   token.level = state.*.level;
-  if((token.nesting > i32(0)), {
+  if(token.nesting > i32(0), {
     state.*.level = (state.*.level + i32(1));
   });
 
@@ -72,249 +70,240 @@ block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
 });
 
 // Create a new StateBlock and precompute line markers
-new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool, enable_table: bool, tokenize_fn: BlockTokenizeFn) -> StateBlock)(
-  {
-    (bytes : str) = str_view(src);
-    (len : i32) = i32(bytes.len());
+new_state_block :: (fn(src : str, env : *Env, tokens : ArrayList(Token), html_enabled : bool, enable_table : bool, tokenize_fn : BlockTokenizeFn) -> StateBlock)({
+  (bytes : str) = src;
+  (len : i32) = i32(bytes.len());
 
-    // Estimate line count: ~60 bytes per line average, +1 for sentinel
-    (est_lines : usize) = ((usize(len) / usize(60)) + usize(2));
-    (b_marks : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
-    (e_marks : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
-    (t_shift : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
-    (s_count : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
-    (bs_count : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+  // Estimate line count: ~60 bytes per line average, +1 for sentinel
+  (est_lines : usize) = ((usize(len) / usize(60)) + usize(2));
+  (mut(b_marks) : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+  (mut(e_marks) : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+  (mut(t_shift) : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+  (mut(s_count) : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+  (mut(bs_count) : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
 
-    // Scan source and compute line markers
-    (start : i32) = i32(0);
-    (pos : i32) = i32(0);
-    (indent : i32) = i32(0);
-    (offset : i32) = i32(0);
-    (indent_found : bool) = false;
+  // Scan source and compute line markers
+  (mut(start) : i32) = i32(0);
+  (mut(pos) : i32) = i32(0);
+  (mut(indent) : i32) = i32(0);
+  (mut(offset) : i32) = i32(0);
+  (mut(indent_found) : bool) = false;
 
-    while((pos < len), {
-      (ch : i32) = i32(bytes.bytes(usize(pos)));
+  while(pos < len, {
+    (ch : i32) = i32(bytes.bytes(usize(pos)));
 
-      if(!(indent_found), {
-        if(is_space(ch), {
-          indent = (indent + i32(1));
-          if((ch == i32(0x09)), {
-            offset = (offset + (i32(4) - (offset % i32(4))));
-          }, {
-            offset = (offset + i32(1));
-          });
-          pos = (pos + i32(1));
+    if(!indent_found, {
+      if(is_space(ch), {
+        indent = (indent + i32(1));
+        if(ch == i32(0x09), {
+          offset = (offset + (i32(4) - (offset % i32(4))));
         }, {
-          indent_found = true;
+          offset = (offset + i32(1));
         });
-      });
-
-      if(indent_found, {
-        if(((ch == i32(0x0A)) || (pos == (len - i32(1)))), {
-          if((ch != i32(0x0A)), {
-            pos = (pos + i32(1));
-          });
-          _ := b_marks.push(start);
-          _ := e_marks.push(pos);
-          _ := t_shift.push(indent);
-          _ := s_count.push(offset);
-          _ := bs_count.push(i32(0));
-
-          indent_found = false;
-          indent = i32(0);
-          offset = i32(0);
-          start = (pos + i32(1));
-          pos = (pos + i32(1));
-        }, {
-          pos = (pos + i32(1));
-        });
+        pos = (pos + i32(1));
+      }, {
+        indent_found = true;
       });
     });
 
-    // Push fake entry to simplify cache bounds checks
-    _ := b_marks.push(len);
-    _ := e_marks.push(len);
-    _ := t_shift.push(i32(0));
-    _ := s_count.push(i32(0));
-    _ := bs_count.push(i32(0));
+    if(indent_found, {
+      if((ch == i32(0x0A)) || (pos == (len - i32(1))), {
+        if(ch != i32(0x0A), {
+          pos = (pos + i32(1));
+        });
+        _ := b_marks.push(start);
+        _ := e_marks.push(pos);
+        _ := t_shift.push(indent);
+        _ := s_count.push(offset);
+        _ := bs_count.push(i32(0));
 
-    (line_max : i32) = (i32(b_marks.len()) - i32(1));
+        indent_found = false;
+        indent = i32(0);
+        offset = i32(0);
+        start = (pos + i32(1));
+        pos = (pos + i32(1));
+      }, {
+        pos = (pos + i32(1));
+      });
+    });
+  });
 
-    StateBlock(
-      src: src,
-      env: env,
-      tokens: tokens,
-      b_marks: b_marks,
-      e_marks: e_marks,
-      t_shift: t_shift,
-      s_count: s_count,
-      bs_count: bs_count,
-      blk_indent: i32(0),
-      line: i32(0),
-      line_max: line_max,
-      tight: false,
-      dd_indent: i32(-1),
-      list_indent: i32(-1),
-      parent_type: PARENT_ROOT,
-      level: i32(0),
-      html_enabled: html_enabled,
-      enable_table: enable_table,
-      _src_bytes: bytes,
-      _tokenize_fn: tokenize_fn
-    )
-  }
-);
+  // Push fake entry to simplify cache bounds checks
+  _ := b_marks.push(len);
+  _ := e_marks.push(len);
+  _ := t_shift.push(i32(0));
+  _ := s_count.push(i32(0));
+  _ := bs_count.push(i32(0));
 
-impl(StateBlock,
+  (line_max : i32) = (i32(b_marks.len()) - i32(1));
+
+  StateBlock(
+    src : src,
+    env : env,
+    tokens : tokens,
+    b_marks : b_marks,
+    e_marks : e_marks,
+    t_shift : t_shift,
+    s_count : s_count,
+    bs_count : bs_count,
+    blk_indent : i32(0),
+    line : i32(0),
+    line_max : line_max,
+    tight : false,
+    dd_indent : i32(-1),
+    list_indent : i32(-1),
+    parent_type : PARENT_ROOT,
+    level : i32(0),
+    html_enabled : html_enabled,
+    enable_table : enable_table,
+    src_bytes : bytes,
+    tokenize_fn : tokenize_fn
+  )
+});
+
+impl(
+  StateBlock,
   // Push a pre-built token to the stream, managing nesting levels.
   // The token's level field is set based on the current state level.
-  push_token : (fn(self: Self, tok: Token) -> unit)({
-    (token : Token) = tok;
+  push_token : (fn(self : &mut Self, tok : Token) -> unit)({
+    (mut(token) : Token) = tok;
 
-    if((token.nesting < i32(0)), {
+    if(token.nesting < i32(0), {
       self.level = (self.level - i32(1));
     });
     token.level = self.level;
-    if((token.nesting > i32(0)), {
+    if(token.nesting > i32(0), {
       self.level = (self.level + i32(1));
     });
 
-    _ := self.tokens.push(token);
+    _ := self.tokens.push(token.clone());
   }),
-
   // Convenience: create a minimal block-level token and push it.
   // Returns a copy of the pushed token (not a reference into the list).
-  push : (fn(self: Self, type_name: TokenType, tag: str, nesting: i32) -> Token)({
-    (token : Token) = Token(
-      type_name: type_name,
-      tag: tag,
-      nesting: nesting,
-      attrs: .None,
-      map: .None,
-      children: .None,
-      content: "",
-      _content_owned: .None,
-      markup: "",
-      info: "",
-      block: true,
-      hidden: false,
-      level: i32(0)
+  push : (fn(self : &mut Self, type_name : TokenType, tag : str, nesting : i32) -> Token)({
+    (mut(token) : Token) = Token(
+      type_name : type_name,
+      tag : tag,
+      nesting : nesting,
+      attrs : .None,
+      map : .None,
+      children : .None,
+      content : "",
+      content_owned : .None,
+      markup : "",
+      info : "",
+      block : true,
+      hidden : false,
+      level : i32(0)
     );
 
-    if((nesting < i32(0)), {
+    if(nesting < i32(0), {
       self.level = (self.level - i32(1));
     });
     token.level = self.level;
-    if((nesting > i32(0)), {
+    if(nesting > i32(0), {
       self.level = (self.level + i32(1));
     });
 
-    _ := self.tokens.push(token);
+    _ := self.tokens.push(token.clone());
     token
   }),
-
   // Check if line is empty
-  is_empty : (fn(self: Self, line_idx: i32) -> bool)(
-    ((self.b_marks(usize(line_idx)) + self.t_shift(usize(line_idx))) >= self.e_marks(usize(line_idx)))
+  is_empty : (fn(self : &Self, line_idx : i32) -> bool)(
+    (self.b_marks(usize(line_idx)) + self.t_shift(usize(line_idx))) >= self.e_marks(usize(line_idx))
   ),
-
   // Skip empty lines from given line number, return first non-empty line
-  skip_empty_lines : (fn(self: Self, from: i32) -> i32)({
-    (line : i32) = from;
-    while((line < self.line_max), {
-      if(((self.b_marks(usize(line)) + self.t_shift(usize(line))) < self.e_marks(usize(line))), {
+  skip_empty_lines : (fn(self : &Self, from : i32) -> i32)({
+    (mut(line) : i32) = from;
+    while(line < self.line_max, {
+      if((self.b_marks(usize(line)) + self.t_shift(usize(line))) < self.e_marks(usize(line)), {
         return(line);
       });
       line = (line + i32(1));
     });
     line
   }),
-
   // Skip spaces from given position
-  skip_spaces : (fn(self: Self, pos_param: i32) -> i32)({
-    (pos : i32) = pos_param;
-    (max : i32) = i32(self._src_bytes.len());
-    while((pos < max), {
-      if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
+  skip_spaces : (fn(self : &Self, pos_param : i32) -> i32)({
+    (mut(pos) : i32) = pos_param;
+    (max : i32) = i32(self.src_bytes.len());
+    while(pos < max, {
+      if(!is_space(i32(self.src_bytes.bytes(usize(pos)))), {
         return(pos);
       });
       pos = (pos + i32(1));
     });
     pos
   }),
-
   // Skip spaces from given position in reverse
-  skip_spaces_back : (fn(self: Self, pos_param: i32, min: i32) -> i32)({
-    (pos : i32) = pos_param;
-    if((pos <= min), {
+  skip_spaces_back : (fn(self : &Self, pos_param : i32, min : i32) -> i32)({
+    (mut(pos) : i32) = pos_param;
+    if(pos <= min, {
       return(pos);
     });
-    while((pos > min), {
+    while(pos > min, {
       pos = (pos - i32(1));
-      if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
+      if(!is_space(i32(self.src_bytes.bytes(usize(pos)))), {
         return(pos + i32(1));
       });
     });
     pos
   }),
-
   // Skip char codes from given position
-  skip_chars : (fn(self: Self, pos_param: i32, code: i32) -> i32)({
-    (pos : i32) = pos_param;
-    (max : i32) = i32(self._src_bytes.len());
-    while((pos < max), {
-      if((i32(self._src_bytes.bytes(usize(pos))) != code), {
+  skip_chars : (fn(self : &Self, pos_param : i32, code : i32) -> i32)({
+    (mut(pos) : i32) = pos_param;
+    (max : i32) = i32(self.src_bytes.len());
+    while(pos < max, {
+      if(i32(self.src_bytes.bytes(usize(pos))) != code, {
         return(pos);
       });
       pos = (pos + i32(1));
     });
     pos
   }),
-
   // Skip char codes reverse from given position - 1
-  skip_chars_back : (fn(self: Self, pos_param: i32, code: i32, min: i32) -> i32)({
-    (pos : i32) = pos_param;
-    if((pos <= min), {
+  skip_chars_back : (fn(self : &Self, pos_param : i32, code : i32, min : i32) -> i32)({
+    (mut(pos) : i32) = pos_param;
+    if(pos <= min, {
       return(pos);
     });
-    while((pos > min), {
+    while(pos > min, {
       pos = (pos - i32(1));
-      if((code != i32(self._src_bytes.bytes(usize(pos)))), {
+      if(code != i32(self.src_bytes.bytes(usize(pos))), {
         return(pos + i32(1));
       });
     });
     pos
   }),
-
   // Cut lines range from source
-  get_lines : (fn(self: Self, begin: i32, end: i32, indent: i32, keep_last_lf: bool) -> String)({
-    if((begin >= end), {
+  get_lines : (fn(self : &Self, begin : i32, end : i32, indent : i32, keep_last_lf : bool) -> String)({
+    if(begin >= end, {
       return(String.new());
     });
 
-    (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
-    (line : i32) = begin;
+    (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
+    (mut(line) : i32) = begin;
 
-    while((line < end), {
-      (line_indent : i32) = i32(0);
+    while(line < end, {
+      (mut(line_indent) : i32) = i32(0);
       (line_start : i32) = self.b_marks(usize(line));
-      (first : i32) = line_start;
+      (mut(first) : i32) = line_start;
       (last_raw : i32) = cond(
         (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks(usize(line)) + i32(1)),
         true => self.e_marks(usize(line))
       );
       // Clamp to source length (last line may not have trailing newline)
       (last : i32) = cond(
-        (last_raw > i32(self._src_bytes.len())) => i32(self._src_bytes.len()),
+        (last_raw > i32(self.src_bytes.len())) => i32(self.src_bytes.len()),
         true => last_raw
       );
 
-      (done : bool) = false;
-      while(((first < last) && ((line_indent < indent) && !(done))), {
-        (ch : i32) = i32(self._src_bytes.bytes(usize(first)));
+      (mut(done) : bool) = false;
+      while((first < last) && ((line_indent < indent) && !done), {
+        (ch : i32) = i32(self.src_bytes.bytes(usize(first)));
         cond(
           is_space(ch) => {
-            if((ch == i32(0x09)), {
+            if(ch == i32(0x09), {
               line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count(usize(line))) % i32(4))));
             }, {
               line_indent = (line_indent + i32(1));
@@ -327,24 +316,24 @@ impl(StateBlock,
             done = true;
           }
         );
-        if(!(done), {
+        if(!done, {
           first = (first + i32(1));
         });
       });
 
-      if((line_indent > indent), {
+      if(line_indent > indent, {
         // Partially expanding tabs: prepend spaces
         (spaces : i32) = (line_indent - indent);
-        (s : i32) = i32(0);
-        while((s < spaces), {
+        (mut(s) : i32) = i32(0);
+        while(s < spaces, {
           out.push(u8(0x20));
           s = (s + i32(1));
         });
       });
 
       // Copy the line bytes directly via pointer
-      if((last > first), {
-        out.extend_from_ptr(self._src_bytes.ptr().add(usize(first)), usize((last - first)));
+      if(last > first, {
+        out.extend_from_ptr(self.src_bytes.ptr().add(usize(first)), usize(last - first));
       });
 
       line = (line + i32(1));

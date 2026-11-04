@@ -8,35 +8,35 @@ pragma(Pragma.AllowUnsafe);
 { StateInline } :: import("./state_inline.yo");
 
 _build_terminator_table :: (fn() -> ArrayList(u8))({
-  (t : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
-  (i : i32) = i32(0);
-  while((i < i32(256)), {
+  (mut(t) : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
+  (mut(i) : i32) = i32(0);
+  while(i < i32(256), {
     _ := t.push(u8(0));
     i = (i + i32(1));
   });
-  &(t(usize(0x0A))).* = u8(1); // \n
-  &(t(usize(0x21))).* = u8(1); // !
-  &(t(usize(0x23))).* = u8(1); // #
-  &(t(usize(0x24))).* = u8(1); // $
-  &(t(usize(0x25))).* = u8(1); // %
-  &(t(usize(0x26))).* = u8(1); // &
-  &(t(usize(0x2A))).* = u8(1); // *
-  &(t(usize(0x2B))).* = u8(1); // +
-  &(t(usize(0x2D))).* = u8(1); // -
-  &(t(usize(0x3A))).* = u8(1); // :
-  &(t(usize(0x3C))).* = u8(1); // <
-  &(t(usize(0x3D))).* = u8(1); // =
-  &(t(usize(0x3E))).* = u8(1); // >
-  &(t(usize(0x40))).* = u8(1); // @
-  &(t(usize(0x5B))).* = u8(1); // [
-  &(t(usize(0x5C))).* = u8(1); // \
-  &(t(usize(0x5D))).* = u8(1); // ]
-  &(t(usize(0x5E))).* = u8(1); // ^
-  &(t(usize(0x5F))).* = u8(1); // _
-  &(t(usize(0x60))).* = u8(1); // `
-  &(t(usize(0x7B))).* = u8(1); // {
-  &(t(usize(0x7D))).* = u8(1); // }
-  &(t(usize(0x7E))).* = u8(1); // ~
+  t(usize(0x0A)) = u8(1); // \n
+  t(usize(0x21)) = u8(1); // !
+  t(usize(0x23)) = u8(1); // #
+  t(usize(0x24)) = u8(1); // $
+  t(usize(0x25)) = u8(1); // %
+  t(usize(0x26)) = u8(1); // &
+  t(usize(0x2A)) = u8(1); // *
+  t(usize(0x2B)) = u8(1); // +
+  t(usize(0x2D)) = u8(1); // -
+  t(usize(0x3A)) = u8(1); // :
+  t(usize(0x3C)) = u8(1); // <
+  t(usize(0x3D)) = u8(1); // =
+  t(usize(0x3E)) = u8(1); // >
+  t(usize(0x40)) = u8(1); // @
+  t(usize(0x5B)) = u8(1); // [
+  t(usize(0x5C)) = u8(1); // \
+  t(usize(0x5D)) = u8(1); // ]
+  t(usize(0x5E)) = u8(1); // ^
+  t(usize(0x5F)) = u8(1); // _
+  t(usize(0x60)) = u8(1); // `
+  t(usize(0x7B)) = u8(1); // {
+  t(usize(0x7D)) = u8(1); // }
+  t(usize(0x7E)) = u8(1); // ~
   t
 });
 
@@ -44,23 +44,23 @@ _build_terminator_table :: (fn() -> ArrayList(u8))({
 _TERMINATOR_TABLE := _build_terminator_table();
 
 // Check if character is a terminator that ends a text run.
-is_terminator_char :: (fn(ch: i32) -> bool)(
-  (_TERMINATOR_TABLE(usize(ch)) == u8(1))
+is_terminator_char :: (fn(ch : i32) -> bool)(
+  _TERMINATOR_TABLE(usize(ch)) == u8(1)
 );
 
-text :: (fn(state: *(StateInline), silent: bool) -> bool)({
-  (pos : i32) = state.*.pos;
+text :: (fn(state : *StateInline, silent : bool) -> bool)({
+  (mut(pos) : i32) = state.*.pos;
 
-  while(((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.bytes(usize(pos)))))), {
+  while((pos < state.*.pos_max) && !is_terminator_char(i32(state.*.src_bytes.bytes(usize(pos)))), {
     pos = (pos + i32(1));
   });
 
-  if((pos == state.*.pos), {
+  if(pos == state.*.pos, {
     return(false);
   });
 
-  if(!(silent), {
-    if((state.*.pending_start < i32(0)), {
+  if(!silent, {
+    if(state.*.pending_start < i32(0), {
       state.*.pending_start = state.*.pos;
     });
   });

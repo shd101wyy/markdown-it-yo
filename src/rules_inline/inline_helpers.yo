@@ -7,28 +7,29 @@ import("std/string");
 { Token, TokenType } :: import("../token.yo");
 { StateInline, TokenMeta, Delimiter } :: import("./state_inline.yo");
 { byte_str_slice } :: import("../common/utils.yo");
+{ replace } :: import("std/mem");
 
 // Inline rule function signature
-InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
+InlineRuleFn :: (fn(state : *StateInline, silent : bool) -> bool);
 
 // Flush pending text into a text token.
-flush_pending :: (fn(state: *(StateInline)) -> unit)({
-  if((state.*.pending_start >= i32(0)), {
-    (content_str : str) = byte_str_slice(state.*._src_bytes, state.*.pending_start, state.*.pos);
+flush_pending :: (fn(state : *StateInline) -> unit)({
+  if(state.*.pending_start >= i32(0), {
+    (content_str : str) = byte_str_slice(state.*.src_bytes, state.*.pending_start, state.*.pos);
     (token : Token) = Token(
-      type_name: .TT_TEXT,
-      tag: "",
-      nesting: i32(0),
-      attrs: .None,
-      map: .None,
-      children: .None,
-      content: content_str,
-      _content_owned: .None,
-      markup: "",
-      info: "",
-      block: false,
-      hidden: false,
-      level: state.*.pending_level
+      type_name : .TT_TEXT,
+      tag : "",
+      nesting : i32(0),
+      attrs : .None,
+      map : .None,
+      children : .None,
+      content : content_str,
+      content_owned : .None,
+      markup : "",
+      info : "",
+      block : false,
+      hidden : false,
+      level : state.*.pending_level
     );
     _ := state.*.tokens.push(token);
     (none_meta : Option(TokenMeta)) = .None;
@@ -38,7 +39,7 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
 });
 
 // Flush pending, then push a pre-built token to the inline state.
-inline_push_token :: (fn(state: *(StateInline), token: Token) -> unit)({
+inline_push_token :: (fn(state : *StateInline, token : Token) -> unit)({
   flush_pending(state);
   _ := state.*.tokens.push(token);
   (none_meta : Option(TokenMeta)) = .None;
@@ -49,46 +50,78 @@ inline_push_token :: (fn(state: *(StateInline), token: Token) -> unit)({
 // Push a new token to the inline state through a pointer.
 // Equivalent to StateInline.push but works through *(StateInline) to ensure
 // mutations to level, delimiters, pending, etc. are not lost.
-state_push :: (fn(state: *(StateInline), type_name: TokenType, tag: str, nesting: i32) -> Token)({
+state_push :: (fn(state : *StateInline, type_name : TokenType, tag : str, nesting : i32) -> Token)({
   flush_pending(state);
 
-  (token : Token) = Token(
-    type_name: type_name,
-    tag: tag,
-    nesting: nesting,
-    attrs: .None,
-    map: .None,
-    children: .None,
-    content: "",
-    _content_owned: .None,
-    markup: "",
-    info: "",
-    block: false,
-    hidden: false,
-    level: i32(0)
+  (mut(token) : Token) = Token(
+    type_name : type_name,
+    tag : tag,
+    nesting : nesting,
+    attrs : .None,
+    map : .None,
+    children : .None,
+    content : "",
+    content_owned : .None,
+    markup : "",
+    info : "",
+    block : false,
+    hidden : false,
+    level : i32(0)
   );
-  (token_meta : Option(TokenMeta)) = .None;
+  (mut(token_meta) : Option(TokenMeta)) = .None;
 
-  if((nesting < i32(0)), {
+  if(nesting < i32(0), {
     state.*.level = (state.*.level - i32(1));
-    if((state.*._prev_delimiters.len() > usize(0)), {
-      state.*.delimiters = state.*._prev_delimiters.pop().unwrap();
-    });
+    // The closed tag's delimiters move into its opener's TokenMeta
+    // (markdown-it shares one list between both; here the meta owns it).
+    match(
+      state.*.prev_delimiters.pop(),
+      .Some(prev) => {
+        closed := replace(&mut state.*.delimiters, prev);
+        match(
+          state.*.open_meta.pop(),
+          .Some(mi) => {
+            state.*.tokens_meta(mi) = .Some(TokenMeta(delimiters : closed));
+          },
+          .None => ()
+        );
+      },
+      .None => ()
+    );
   });
 
   token.level = state.*.level;
 
-  if((nesting > i32(0)), {
+  if(nesting > i32(0), {
     state.*.level = (state.*.level + i32(1));
-    _ := state.*._prev_delimiters.push(state.*.delimiters);
-    state.*.delimiters = ArrayList(Delimiter).new();
-    token_meta = .Some(TokenMeta(delimiters: state.*.delimiters));
+    (outer : ArrayList(Delimiter)) = replace(&mut state.*.delimiters, ArrayList(Delimiter).new());
+    _ := state.*.prev_delimiters.push(outer);
+    _ := state.*.open_meta.push(state.*.tokens_meta.len());
+    token_meta = .Some(TokenMeta(delimiters : ArrayList(Delimiter).new()));
   });
 
   state.*.pending_level = state.*.level;
-  _ := state.*.tokens.push(token);
+  _ := state.*.tokens.push(token.clone());
   _ := state.*.tokens_meta.push(token_meta);
   token
 });
 
-export(InlineRuleFn, flush_pending, inline_push_token, state_push);
+// After tokenizing, move the delimiters of tags left open into their
+// openers' metas, innermost first, so the top-level list is current again.
+close_open_delimiters :: (fn(state : *StateInline) -> unit)({
+  while(state.*.open_meta.len() > usize(0), {
+    match(
+      state.*.prev_delimiters.pop(),
+      .Some(prev) => {
+        closed := replace(&mut state.*.delimiters, prev);
+        mi := state.*.open_meta.pop().unwrap();
+        state.*.tokens_meta(mi) = .Some(TokenMeta(delimiters : closed));
+      },
+      .None => {
+        _ := state.*.open_meta.pop();
+      }
+    );
+  });
+});
+
+export(InlineRuleFn, flush_pending, inline_push_token, state_push, close_open_delimiters);

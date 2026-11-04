@@ -18,93 +18,42 @@ LinkDestResult :: struct(
 //
 // - `<url>` form: angles are required, no spaces/newlines inside
 // - bare form: balanced parentheses, no spaces/control chars
-parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResult)(
-  {
-    (pos : i32) = start;
-    (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: String.new());
+parse_link_destination :: (fn(input : str, start : i32, max : i32) -> LinkDestResult)({
+  (mut(pos) : i32) = start;
+  (mut(result) : LinkDestResult) = LinkDestResult(ok : false, pos : i32(0), str : String.new());
 
-    if((pos >= max), {
-      return(result);
-    });
+  if(pos >= max, {
+    return(result);
+  });
 
-    (code : u8) = input.bytes(usize(pos));
+  (mut(code) : u8) = input.bytes(usize(pos));
 
-    // Parse <url> form
-    if((code == u8(0x3C)), {
-      pos = (pos + i32(1));
-      while((pos < max), {
-        code = input.bytes(usize(pos));
-        cond(
-          // \n - not allowed inside <...>
-          (code == u8(0x0A)) => {
-            return(result);
-          },
-          // < - not allowed inside <...>
-          (code == u8(0x3C)) => {
-            return(result);
-          },
-          // > - closing angle bracket
-          (code == u8(0x3E)) => {
-            result = LinkDestResult(
-              ok: true,
-              pos: (pos + i32(1)),
-              str: unescape_all(byte_substring(input, (start + i32(1)), pos))
-            );
-            return(result);
-          },
-          // backslash escape
-          ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
-            pos = (pos + i32(2));
-          },
-          true => {
-            pos = (pos + i32(1));
-          }
-        );
-      });
-
-      // no closing '>'
-      return(result);
-    });
-
-    // Parse bare url form
-    (level : i32) = i32(0);
-    (done : bool) = false;
-    while(((pos < max) && !(done)), {
+  // Parse <url> form
+  if(code == u8(0x3C), {
+    pos = (pos + i32(1));
+    while(pos < max, {
       code = input.bytes(usize(pos));
-
       cond(
-        // space - end of url
-        (code == u8(0x20)) => {
-          done = true;
+        // \n - not allowed inside <...>
+        (code == u8(0x0A)) => {
+          return(result);
         },
-        // ascii control characters
-        ((i32(code) < i32(0x20)) || (code == u8(0x7F))) => {
-          done = true;
+        // < - not allowed inside <...>
+        (code == u8(0x3C)) => {
+          return(result);
+        },
+        // > - closing angle bracket
+        (code == u8(0x3E)) => {
+          result = LinkDestResult(
+            ok : true,
+            pos : (pos + i32(1)),
+            str : unescape_all(byte_substring(input, start + i32(1), pos))
+          );
+          return(result);
         },
         // backslash escape
         ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
-          if((input.bytes(usize((pos + i32(1)))) == u8(0x20)), {
-            done = true;
-          }, {
-            pos = (pos + i32(2));
-          });
-        },
-        // opening paren
-        (code == u8(0x28)) => {
-          level = (level + i32(1));
-          if((level > i32(32)), {
-            return(result);
-          });
-          pos = (pos + i32(1));
-        },
-        // closing paren
-        (code == u8(0x29)) => {
-          if((level == i32(0)), {
-            done = true;
-          }, {
-            level = (level - i32(1));
-            pos = (pos + i32(1));
-          });
+          pos = (pos + i32(2));
         },
         true => {
           pos = (pos + i32(1));
@@ -112,20 +61,69 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
       );
     });
 
-    if((start == pos), {
-      return(result);
-    });
-    if((level != i32(0)), {
-      return(result);
-    });
+    // no closing '>'
+    return(result);
+  });
 
-    result = LinkDestResult(
-      ok: true,
-      pos: pos,
-      str: unescape_all(byte_substring(input, start, pos))
+  // Parse bare url form
+  (mut(level) : i32) = i32(0);
+  (mut(done) : bool) = false;
+  while((pos < max) && !done, {
+    code = input.bytes(usize(pos));
+
+    cond(
+      // space - end of url
+      (code == u8(0x20)) => {
+        done = true;
+      },
+      // ascii control characters
+      ((i32(code) < i32(0x20)) || (code == u8(0x7F))) => {
+        done = true;
+      },
+      // backslash escape
+      ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
+        if(input.bytes(usize(pos + i32(1))) == u8(0x20), {
+          done = true;
+        }, {
+          pos = (pos + i32(2));
+        });
+      },
+      // opening paren
+      (code == u8(0x28)) => {
+        level = (level + i32(1));
+        if(level > i32(32), {
+          return(result);
+        });
+        pos = (pos + i32(1));
+      },
+      // closing paren
+      (code == u8(0x29)) => {
+        if(level == i32(0), {
+          done = true;
+        }, {
+          level = (level - i32(1));
+          pos = (pos + i32(1));
+        });
+      },
+      true => {
+        pos = (pos + i32(1));
+      }
     );
-    result
-  }
-);
+  });
+
+  if(start == pos, {
+    return(result);
+  });
+  if(level != i32(0), {
+    return(result);
+  });
+
+  result = LinkDestResult(
+    ok : true,
+    pos : pos,
+    str : unescape_all(byte_substring(input, start, pos))
+  );
+  result
+});
 
 export(LinkDestResult, parse_link_destination);

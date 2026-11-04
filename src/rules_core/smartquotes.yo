@@ -15,14 +15,16 @@ pragma(Pragma.AllowUnsafe);
 // The quote scan walks BYTE positions but neighbor classification needs the
 // actual punctuation rune — e.g. the byte before a quote may be the tail of
 // a multibyte em-dash, which Unicode punctuation rules must see.
-_at_rune :: (fn(s: String, i: usize) -> i32)(
-  match(s.at(i), 
+_at_rune :: (fn(s : &String, i : usize) -> i32)(
+  match(
+    s.at(i),
     .Some(r) => i32(r.to_u32()),
     .None => {
-      (k : usize) = usize(1);
-      (found : i32) = i32(0);
-      while(((k <= usize(3)) && (k <= i) && (found == i32(0))), {
-        found = match(s.at(i - k), 
+      (mut(k) : usize) = usize(1);
+      (mut(found) : i32) = i32(0);
+      while((k <= usize(3)) && (k <= i) && (found == i32(0)), {
+        found = match(
+          s.at(i - k),
           .Some(r) => i32(r.to_u32()),
           .None => i32(0)
         );
@@ -42,83 +44,84 @@ _QuoteEntry :: struct(
   single : bool,
   level : i32
 );
+derive(_QuoteEntry, Copy, Clone);
 
 // Replace character at position in string
-_replace_at :: (fn(s: String, index: usize, ch: String) -> String)({
-  (before : String) = s.substring(usize(0), index);
-  (after : String) = s.substring((index + usize(1)), s.len());
+_replace_at :: (fn(s : String, index : usize, ch : &String) -> String)({
+  (mut(before) : String) = s.substring(usize(0), index);
+  (after : String) = s.substring(index + usize(1), s.len());
   before.push_string(ch);
-  before.push_string(after);
+  before.push_string(&after);
   before
 });
 
 // Process inline tokens for smart quotes
-_process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> unit)({
-  (stack : ArrayList(_QuoteEntry)) = ArrayList(_QuoteEntry).new();
-  (i : i32) = i32(0);
+_process_inlines :: (fn(tokens : &mut ArrayList(Token), quotes : &ArrayList(String)) -> unit)({
+  (mut(stack) : ArrayList(_QuoteEntry)) = ArrayList(_QuoteEntry).new();
+  (mut(i) : i32) = i32(0);
   (tokens_len : i32) = i32(tokens.len());
 
-  while((i < tokens_len), {
-    (token : *(Token)) = &(tokens(usize(i)));
+  while(i < tokens_len, {
+    (token : *Token) = addr_of(tokens(usize(i)));
     (this_level : i32) = token.*.level;
 
     // Trim stack to current nesting level
-    (j : i32) = (i32(stack.len()) - i32(1));
-    while(((j >= i32(0)) && (stack(usize(j)).level > this_level)), {
+    (mut(j) : i32) = (i32(stack.len()) - i32(1));
+    while((j >= i32(0)) && (stack(usize(j)).level > this_level), {
       j = (j - i32(1));
     });
     // Truncate stack to j+1
-    while((i32(stack.len()) > (j + i32(1))), {
+    while(i32(stack.len()) > (j + i32(1)), {
       _ := stack.pop();
     });
 
-    if((token.*.type_name != .TT_TEXT), {
+    if(token.*.type_name != .TT_TEXT, {
       i = (i + i32(1));
     }, {
-      (text : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
-      (pos : usize) = usize(0);
+      (mut(text) : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
+      (mut(pos) : usize) = usize(0);
       // BYTE length: the scan walks byte positions (ASCII quote chars).
-      (max : usize) = text.as_bytes().len();
-      (done : bool) = false;
+      (mut(max) : usize) = text.len();
+      (mut(done) : bool) = false;
 
-      while(((pos < max) && !(done)), {
+      while((pos < max) && !done, {
         // Find next quote character
-        (found_quote : bool) = false;
-        (quote_pos : usize) = pos;
-        while(((quote_pos < max) && !(found_quote)), {
+        (mut(found_quote) : bool) = false;
+        (mut(quote_pos) : usize) = pos;
+        while((quote_pos < max) && !found_quote, {
           (qch : rune) = match(text.at(quote_pos), .Some(r) => r, .None => rune(u32(0)));
-          if(((qch == rune(u32(0x27))) || (qch == rune(u32(0x22)))), {
+          if((qch == rune(u32(0x27))) || (qch == rune(u32(0x22))), {
             found_quote = true;
           }, {
             quote_pos = (quote_pos + usize(1));
           });
         });
 
-        if(!(found_quote), {
+        if(!found_quote, {
           done = true;
         }, {
           (quote_char : rune) = match(text.at(quote_pos), .Some(r) => r, .None => rune(u32(0)));
           (is_single : bool) = (quote_char == rune(u32(0x27)));
           pos = (quote_pos + usize(1));
 
-          (can_open : bool) = true;
-          (can_close : bool) = true;
+          (mut(can_open) : bool) = true;
+          (mut(can_close) : bool) = true;
 
           // Find previous character (default to space)
-          (last_char : i32) = i32(0x20);
-          if((quote_pos > usize(0)), {
-            last_char = _at_rune(text, quote_pos - usize(1));
+          (mut(last_char) : i32) = i32(0x20);
+          if(quote_pos > usize(0), {
+            last_char = _at_rune(&text, quote_pos - usize(1));
           }, {
             // Look at previous tokens
-            (pj : i32) = (i - i32(1));
-            (found_prev : bool) = false;
-            while(((pj >= i32(0)) && !(found_prev)), {
-              (prev_tok : *(Token)) = &(tokens(usize(pj)));
-              if(((prev_tok.*.type_name == .TT_SOFTBREAK) || (prev_tok.*.type_name == .TT_HARDBREAK)), {
+            (mut(pj) : i32) = (i - i32(1));
+            (mut(found_prev) : bool) = false;
+            while((pj >= i32(0)) && !found_prev, {
+              (prev_tok : *Token) = addr_of(tokens(usize(pj)));
+              if((prev_tok.*.type_name == .TT_SOFTBREAK) || (prev_tok.*.type_name == .TT_HARDBREAK), {
                 found_prev = true;
               }, {
-                if((prev_tok.*.content.len() > usize(0)), {
-                  last_char = i32(prev_tok.*.content.bytes((prev_tok.*.content.len() - usize(1))));
+                if(prev_tok.*.content.len() > usize(0), {
+                  last_char = i32(prev_tok.*.content.bytes(prev_tok.*.content.len() - usize(1)));
                   found_prev = true;
                 }, {
                   pj = (pj - i32(1));
@@ -128,19 +131,19 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
           });
 
           // Find next character (default to space)
-          (next_char : i32) = i32(0x20);
-          if((pos < max), {
-            next_char = _at_rune(text, pos);
+          (mut(next_char) : i32) = i32(0x20);
+          if(pos < max, {
+            next_char = _at_rune(&text, pos);
           }, {
             // Look at next tokens
-            (nj : i32) = (i + i32(1));
-            (found_next : bool) = false;
-            while(((nj < tokens_len) && !(found_next)), {
-              (next_tok : *(Token)) = &(tokens(usize(nj)));
-              if(((next_tok.*.type_name == .TT_SOFTBREAK) || (next_tok.*.type_name == .TT_HARDBREAK)), {
+            (mut(nj) : i32) = (i + i32(1));
+            (mut(found_next) : bool) = false;
+            while((nj < tokens_len) && !found_next, {
+              (next_tok : *Token) = addr_of(tokens(usize(nj)));
+              if((next_tok.*.type_name == .TT_SOFTBREAK) || (next_tok.*.type_name == .TT_HARDBREAK), {
                 found_next = true;
               }, {
-                if((next_tok.*.content.len() > usize(0)), {
+                if(next_tok.*.content.len() > usize(0), {
                   next_char = i32(next_tok.*.content.bytes(usize(0)));
                   found_next = true;
                 }, {
@@ -150,8 +153,8 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             });
           });
 
-          (is_last_punct : bool) = ((is_md_ascii_punct(last_char)) || (is_punct_char(last_char)));
-          (is_next_punct : bool) = ((is_md_ascii_punct(next_char)) || (is_punct_char(next_char)));
+          (is_last_punct : bool) = (is_md_ascii_punct(last_char) || is_punct_char(last_char));
+          (is_next_punct : bool) = (is_md_ascii_punct(next_char) || is_punct_char(next_char));
           (is_last_ws : bool) = is_white_space(last_char);
           (is_next_ws : bool) = is_white_space(next_char);
 
@@ -159,7 +162,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             can_open = false;
           }, {
             if(is_next_punct, {
-              if(!(((is_last_ws) || (is_last_punct))), {
+              if(!(is_last_ws || is_last_punct), {
                 can_open = false;
               });
             });
@@ -169,76 +172,78 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             can_close = false;
           }, {
             if(is_last_punct, {
-              if(!(((is_next_ws) || (is_next_punct))), {
+              if(!(is_next_ws || is_next_punct), {
                 can_close = false;
               });
             });
           });
 
           // Special case: 1"" - first quote as inch
-          if(((next_char == i32(0x22)) && (quote_char == rune(u32(0x22)))), {
-            if(((last_char >= i32(0x30)) && (last_char <= i32(0x39))), {
+          if((next_char == i32(0x22)) && (quote_char == rune(u32(0x22))), {
+            if((last_char >= i32(0x30)) && (last_char <= i32(0x39)), {
               can_close = false;
               can_open = false;
             });
           });
 
-          if((can_open && can_close), {
+          if(can_open && can_close, {
             can_open = is_last_punct;
             can_close = is_next_punct;
           });
 
-          if((!(can_open) && !(can_close)), {
+          if(!can_open && !can_close, {
             // Middle of word — replace single quote with apostrophe
             if(is_single, {
-              text = _replace_at(text, quote_pos, APOSTROPHE);
-              token.*.content = str_view(text);
-              token.*._content_owned = .Some(text);
+              text = _replace_at(text, quote_pos, &APOSTROPHE);
+              (owned_text : String) = text.clone();
+              token.*.content = str_view(&owned_text);
+              token.*.content_owned = .Some(owned_text);
             });
           }, {
             if(can_close, {
               // Try to find matching opening quote on stack
-              (sj : i32) = (i32(stack.len()) - i32(1));
-              (matched : bool) = false;
-              while(((sj >= i32(0)) && !(matched)), {
+              (mut(sj) : i32) = (i32(stack.len()) - i32(1));
+              (mut(matched) : bool) = false;
+              while((sj >= i32(0)) && !matched, {
                 (item : _QuoteEntry) = stack(usize(sj));
-                if((item.level < this_level), {
+                if(item.level < this_level, {
                   sj = i32(-1);
                 }, {
-                  if(((item.single == is_single) && (item.level == this_level)), {
+                  if((item.single == is_single) && (item.level == this_level), {
                     (open_quote : String) = cond(
-                      is_single => quotes(usize(2)),
-                      true => quotes(usize(0))
+                      is_single => quotes(usize(2)).clone(),
+                      true => quotes(usize(0)).clone()
                     );
                     (close_quote : String) = cond(
-                      is_single => quotes(usize(3)),
-                      true => quotes(usize(1))
+                      is_single => quotes(usize(3)).clone(),
+                      true => quotes(usize(1)).clone()
                     );
 
                     // Replace closing quote first (before opening, in case same token)
-                    text = _replace_at(text, quote_pos, close_quote);
-                    token.*.content = str_view(text);
-                    token.*._content_owned = .Some(text);
+                    text = _replace_at(text, quote_pos, &close_quote);
+                    (owned_text : String) = text.clone();
+                    token.*.content = str_view(&owned_text);
+                    token.*.content_owned = .Some(owned_text);
 
                     // Replace opening quote
-                    (open_tok : *(Token)) = &(tokens(usize(item.token_idx)));
+                    (open_tok : *Token) = addr_of(tokens(usize(item.token_idx)));
                     (open_content : String) = byte_substring(open_tok.*.content, i32(0), i32(open_tok.*.content.len()));
-                    (replaced_open : String) = _replace_at(open_content, item.pos, open_quote);
-                    open_tok.*.content = str_view(replaced_open);
-                    open_tok.*._content_owned = .Some(replaced_open);
+                    (replaced_open : String) = _replace_at(open_content, item.pos, &open_quote);
+                    open_tok.*.content = str_view(&replaced_open);
+                    open_tok.*.content_owned = .Some(replaced_open);
 
                     // Adjust position if same token
-                    pos = (pos + (close_quote.as_bytes().len() - usize(1)));
-                    if((item.token_idx == i), {
-                      pos = (pos + (open_quote.as_bytes().len() - usize(1)));
+                    pos = (pos + (close_quote.len() - usize(1)));
+                    if(item.token_idx == i, {
+                      pos = (pos + (open_quote.len() - usize(1)));
                     });
 
                     // Re-read text after modification
-                    text = byte_substring(&(tokens(usize(i))).*.content, i32(0), i32(&(tokens(usize(i))).*.content.len()));
+                    text = byte_substring(tokens(usize(i)).content, i32(0), i32(tokens(usize(i)).content.len()));
                     max = text.len();
 
                     // Truncate stack
-                    while((i32(stack.len()) > sj), {
+                    while(i32(stack.len()) > sj, {
                       _ := stack.pop();
                     });
                     matched = true;
@@ -247,25 +252,27 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                   });
                 });
               });
-              if(!(matched), {
+              if(!matched, {
                 if(can_open, {
-                  _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+                  _ := stack.push(_QuoteEntry(token_idx : i, pos : quote_pos, single : is_single, level : this_level));
                 }, {
                   if(is_single, {
-                    text = _replace_at(text, quote_pos, APOSTROPHE);
-                    token.*.content = str_view(text);
-                    token.*._content_owned = .Some(text);
+                    text = _replace_at(text, quote_pos, &APOSTROPHE);
+                    (owned_text : String) = text.clone();
+                    token.*.content = str_view(&owned_text);
+                    token.*.content_owned = .Some(owned_text);
                   });
                 });
               });
             }, {
               if(can_open, {
-                _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+                _ := stack.push(_QuoteEntry(token_idx : i, pos : quote_pos, single : is_single, level : this_level));
               }, {
                 if(is_single, {
-                  text = _replace_at(text, quote_pos, APOSTROPHE);
-                  token.*.content = str_view(text);
-                  token.*._content_owned = .Some(text);
+                  text = _replace_at(text, quote_pos, &APOSTROPHE);
+                  (owned_text : String) = text.clone();
+                  token.*.content = str_view(&owned_text);
+                  token.*.content_owned = .Some(owned_text);
                 });
               });
             });
@@ -279,23 +286,25 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
 });
 
 // Main smartquotes rule
-smartquotes :: (fn(state: *(StateCore), quotes: ArrayList(String)) -> unit)({
-  (blk_idx : i32) = (i32(state.*.tokens.len()) - i32(1));
-  while((blk_idx >= i32(0)), {
-    (block_tok : *(Token)) = &(state.*.tokens(usize(blk_idx)));
-    if((block_tok.*.type_name == .TT_INLINE), {
+smartquotes :: (fn(state : *StateCore, quotes : &ArrayList(String)) -> unit)({
+  (mut(blk_idx) : i32) = (i32(state.*.tokens.len()) - i32(1));
+  while(blk_idx >= i32(0), {
+    (block_tok : *Token) = addr_of(state.*.tokens(usize(blk_idx)));
+    if(block_tok.*.type_name == .TT_INLINE, {
       // Quick test: does content contain any quotes?
-      (has_quotes : bool) = false;
-      (qi : usize) = usize(0);
-      while(((qi < block_tok.*.content.len()) && !(has_quotes)), {
+      (mut(has_quotes) : bool) = false;
+      (mut(qi) : usize) = usize(0);
+      while((qi < block_tok.*.content.len()) && !has_quotes, {
         (qb : u8) = block_tok.*.content.bytes(qi);
-        if(((qb == u8(0x27)) || (qb == u8(0x22))), {
+        if((qb == u8(0x27)) || (qb == u8(0x22)), {
           has_quotes = true;
         });
         qi = (qi + usize(1));
       });
       if(has_quotes, {
-        match(block_tok.*.children,
+        children_place := &mut block_tok.*.children;
+        match(
+          children_place,
           .Some(children) => _process_inlines(children, quotes),
           .None => ()
         );

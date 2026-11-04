@@ -6,10 +6,10 @@
 import("std/string");
 
 // Count consecutive backtick characters starting at pos.
-_count_backticks :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
-  (count : i32) = i32(0);
-  (p : i32) = pos;
-  while((((p < max) && (i32(src_bytes.bytes(usize(p))) == i32(0x60)))), {
+_count_backticks :: (fn(src_bytes : str, pos : i32, max : i32) -> i32)({
+  (mut(count) : i32) = i32(0);
+  (mut(p) : i32) = pos;
+  while((p < max) && (i32(src_bytes.bytes(usize(p))) == i32(0x60)), {
     count = (count + i32(1));
     p = (p + i32(1));
   });
@@ -18,9 +18,9 @@ _count_backticks :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
 
 // Try to skip an autolink or HTML inline starting at '<'.
 // Returns the position after '>', or -1 if not a valid <...> construct.
-_skip_angle_bracket :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
-  (p : i32) = (pos + i32(1));
-  while((p < max), {
+_skip_angle_bracket :: (fn(src_bytes : str, pos : i32, max : i32) -> i32)({
+  (mut(p) : i32) = (pos + i32(1));
+  while(p < max, {
     (ch : i32) = i32(src_bytes.bytes(usize(p)));
     cond(
       (ch == i32(0x3E)) => {
@@ -41,14 +41,14 @@ _skip_angle_bracket :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
 });
 
 // Skip a backtick code span starting at pos. Returns position after the closing backticks.
-_skip_code_span :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
+_skip_code_span :: (fn(src_bytes : str, pos : i32, max : i32) -> i32)({
   (open_count : i32) = _count_backticks(src_bytes, pos, max);
-  (scan_pos : i32) = (pos + open_count);
-  (found_close : bool) = false;
-  while((((scan_pos < max) && !(found_close))), {
-    if((i32(src_bytes.bytes(usize(scan_pos))) == i32(0x60)), {
+  (mut(scan_pos) : i32) = (pos + open_count);
+  (mut(found_close) : bool) = false;
+  while((scan_pos < max) && !found_close, {
+    if(i32(src_bytes.bytes(usize(scan_pos))) == i32(0x60), {
       (close_count : i32) = _count_backticks(src_bytes, scan_pos, max);
-      if((close_count == open_count), {
+      if(close_count == open_count, {
         found_close = true;
         scan_pos = (scan_pos + close_count);
       }, {
@@ -65,17 +65,17 @@ _skip_code_span :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
 // Returns the position of the closing ']', or -1 if not found.
 // `disable_nested` — if true, returns -1 when nested link/image tokens are found
 // (but plain nested brackets are allowed, matching JS skip_token behavior).
-parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested: bool) -> i32)({
+parse_link_label :: (fn(src_bytes : str, start : i32, pos_max : i32, disable_nested : bool) -> i32)({
   (max : i32) = pos_max;
-  (pos : i32) = (start + i32(1));
-  (level : i32) = i32(1);
+  (mut(pos) : i32) = (start + i32(1));
+  (mut(level) : i32) = i32(1);
 
   // RFC 5765 limit: label length must be <= 999 chars
-  if(((max - pos) > i32(999)), {
+  if((max - pos) > i32(999), {
     return(i32(-1));
   });
 
-  while((pos < max), {
+  while(pos < max, {
     (marker : i32) = i32(src_bytes.bytes(usize(pos)));
 
     cond(
@@ -86,7 +86,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
       // Closing bracket
       (marker == i32(0x5D)) => {
         level = (level - i32(1));
-        if((level == i32(0)), {
+        if(level == i32(0), {
           return(pos);
         });
         pos = (pos + i32(1));
@@ -96,32 +96,42 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
         if(disable_nested, {
           // Use recur to find matching ']' (without disable_nested to avoid infinite recursion)
           (inner_end : i32) = recur(src_bytes, pos, max, false);
-          if((inner_end >= i32(0)), {
+          if(inner_end >= i32(0), {
             (after : i32) = (inner_end + i32(1));
-            if((after < max), {
+            if(after < max, {
               (next_ch : i32) = i32(src_bytes.bytes(usize(after)));
               // Check if followed by '(' (inline link) — scan for matching ')'
-              if((next_ch == i32(0x28)), {
-                (p : i32) = (after + i32(1));
-                (depth : i32) = i32(1);
-                while((((p < max) && (depth > i32(0)))), {
+              if(next_ch == i32(0x28), {
+                (mut(p) : i32) = (after + i32(1));
+                (mut(depth) : i32) = i32(1);
+                while((p < max) && (depth > i32(0)), {
                   (ch : i32) = i32(src_bytes.bytes(usize(p)));
                   cond(
-                    (ch == i32(0x5C)) => { p = (p + i32(2)); },
-                    (ch == i32(0x28)) => { depth = (depth + i32(1)); p = (p + i32(1)); },
-                    (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
-                    true => { p = (p + i32(1)); }
+                    (ch == i32(0x5C)) => {
+                      p = (p + i32(2));
+                    },
+                    (ch == i32(0x28)) => {
+                      depth = (depth + i32(1));
+                      p = (p + i32(1));
+                    },
+                    (ch == i32(0x29)) => {
+                      depth = (depth - i32(1));
+                      p = (p + i32(1));
+                    },
+                    true => {
+                      p = (p + i32(1));
+                    }
                   );
                 });
-                if((depth == i32(0)), {
+                if(depth == i32(0), {
                   // Found complete [text](url) — nested link, disallow
                   return(i32(-1));
                 });
               });
               // Check if followed by '[' (reference link)
-              if((next_ch == i32(0x5B)), {
+              if(next_ch == i32(0x5B), {
                 (ref_end : i32) = recur(src_bytes, after, max, false);
-                if((ref_end >= i32(0)), {
+                if(ref_end >= i32(0), {
                   // Found complete [text][ref] — nested link, disallow
                   return(i32(-1));
                 });
@@ -140,7 +150,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
       // Angle bracket — skip autolink or HTML inline <...>
       (marker == i32(0x3C)) => {
         (skip_end : i32) = _skip_angle_bracket(src_bytes, pos, max);
-        if((skip_end > i32(0)), {
+        if(skip_end > i32(0), {
           pos = skip_end;
         }, {
           pos = (pos + i32(1));
@@ -149,44 +159,54 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
       // Exclamation mark — check for image pattern ![alt](url) or ![alt][ref]
       // Images inside links are allowed, so skip past the entire image pattern
       (marker == i32(0x21)) => {
-        if((((pos + i32(1)) < max) && (i32(src_bytes.bytes(usize((pos + i32(1))))) == i32(0x5B))), {
+        if(((pos + i32(1)) < max) && (i32(src_bytes.bytes(usize(pos + i32(1)))) == i32(0x5B)), {
           // Found '![' — check if it forms a complete image to skip over
-          (img_label_end : i32) = recur(src_bytes, (pos + i32(1)), max, false);
-          if((img_label_end >= i32(0)), {
+          (img_label_end : i32) = recur(src_bytes, pos + i32(1), max, false);
+          if(img_label_end >= i32(0), {
             (after : i32) = (img_label_end + i32(1));
-            (skipped : bool) = false;
-            if((after < max), {
+            (mut(skipped) : bool) = false;
+            if(after < max, {
               (next_ch : i32) = i32(src_bytes.bytes(usize(after)));
               // Check for ![alt](url) — skip past closing ')'
-              if((next_ch == i32(0x28)), {
-                (p : i32) = (after + i32(1));
-                (depth : i32) = i32(1);
-                while((((p < max) && (depth > i32(0)))), {
+              if(next_ch == i32(0x28), {
+                (mut(p) : i32) = (after + i32(1));
+                (mut(depth) : i32) = i32(1);
+                while((p < max) && (depth > i32(0)), {
                   (ch : i32) = i32(src_bytes.bytes(usize(p)));
                   cond(
-                    (ch == i32(0x5C)) => { p = (p + i32(2)); },
-                    (ch == i32(0x28)) => { depth = (depth + i32(1)); p = (p + i32(1)); },
-                    (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
-                    true => { p = (p + i32(1)); }
+                    (ch == i32(0x5C)) => {
+                      p = (p + i32(2));
+                    },
+                    (ch == i32(0x28)) => {
+                      depth = (depth + i32(1));
+                      p = (p + i32(1));
+                    },
+                    (ch == i32(0x29)) => {
+                      depth = (depth - i32(1));
+                      p = (p + i32(1));
+                    },
+                    true => {
+                      p = (p + i32(1));
+                    }
                   );
                 });
-                if((depth == i32(0)), {
+                if(depth == i32(0), {
                   pos = p;
                   skipped = true;
                 });
               });
               // Check for ![alt][ref] — skip past closing ']'
-              if((!(skipped)), {
-                if((next_ch == i32(0x5B)), {
+              if(!skipped, {
+                if(next_ch == i32(0x5B), {
                   (ref_end : i32) = recur(src_bytes, after, max, false);
-                  if((ref_end >= i32(0)), {
+                  if(ref_end >= i32(0), {
                     pos = (ref_end + i32(1));
                     skipped = true;
                   });
                 });
               });
             });
-            if((!(skipped)), {
+            if(!skipped, {
               pos = (pos + i32(1));
             });
           }, {
