@@ -57,7 +57,7 @@ flags below set:
 ```rust
 { new_markdown_it_with_options, default_options, commonmark_options, Options } :: import("markdown_it_yo");
 
-(opts : Options) = default_options();
+(mut(opts) : Options) = default_options();
 opts.html = true;
 opts.typographer = true;
 md := new_markdown_it_with_options(opts);
