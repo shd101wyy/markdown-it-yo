@@ -9,7 +9,7 @@
 { Options, default_options } :: import("../src/options.yo");
 
 main :: (fn() -> unit)({
-  println(`=== markdown_it_yo end-to-end tests ===`);
+  println(`=== markdown-it-yo end-to-end tests ===`);
 
   // Test 1: Empty input
   {

@@ -1,8 +1,8 @@
-// Library root module — markdown_it_yo
+// Library root module — markdown-it-yo
 //
 // A Yo port of markdown-it (v14.1.1), a modern pluggable markdown parser.
 // The renderer — the package's primary API, re-exported so a consumer can
-// write import("markdown_it_yo") and get it.
+// write import("markdown-it-yo") and get it.
 { MarkdownIt, ParsedDocument, new_markdown_it, new_markdown_it_with_options } :: import("./markdown_it.yo");
 { Options, default_options, commonmark_options } :: import("./options.yo");
 

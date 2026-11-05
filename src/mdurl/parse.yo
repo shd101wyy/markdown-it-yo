@@ -108,7 +108,7 @@ _find_earliest :: (fn(bytes : *(ArrayList(u8)), set : str, start : usize) -> i32
         (pos : i32) = i32(i);
         if(((result == i32(-1)) || (pos < result)), {
           result = pos;
-        };
+        });
         i = bytes.*.len();
       }, {
         i = (i + usize(1));

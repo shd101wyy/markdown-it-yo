@@ -1,6 +1,6 @@
 ---
 applyTo: "tests/**"
-description: "Testing conventions for the markdown_it_yo project. Covers test file structure, fixture-based testing, and benchmark patterns."
+description: "Testing conventions for the markdown-it-yo project. Covers test file structure, fixture-based testing, and benchmark patterns."
 ---
 
 # Testing Conventions
@@ -32,10 +32,10 @@ cd /path/to/Yo
 bun run build
 
 # Run specific test file
-./yo-cli test /path/to/markdown_it_yo/tests/token.test.yo --bail -v
+./yo-cli test /path/to/markdown-it-yo/tests/token.test.yo --bail -v
 
 # Run with verbose output saved to file
-./yo-cli test /path/to/markdown_it_yo/tests/token.test.yo --bail -v &> test_output.txt
+./yo-cli test /path/to/markdown-it-yo/tests/token.test.yo --bail -v &> test_output.txt
 ```
 
 ## Fixture-Based Tests

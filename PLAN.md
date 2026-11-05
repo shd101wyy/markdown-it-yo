@@ -8,7 +8,7 @@ Port [markdown-it](https://github.com/markdown-it/markdown-it) (v14.1.1) — a m
 
 1. **100% behavioral parity** with markdown-it's JS implementation (same input → same HTML output)
 2. **Full test suite** ported from markdown-it's Mocha/fixture-based tests to Yo test files
-3. **Benchmark harness** comparing markdown_it_yo (native + WASM) against markdown-it (Node.js)
+3. **Benchmark harness** comparing markdown-it-yo (native + WASM) against markdown-it (Node.js)
 4. **Compilation targets:** native (macOS/Linux) and WASM (Emscripten / WASI)
 
 ---
@@ -108,7 +108,7 @@ Input string
 ## Project Structure
 
 ```
-markdown_it_yo/
+markdown-it-yo/
 ├── build.yo                         # Build configuration
 ├── PLAN.md                          # This file
 ├── src/
@@ -464,13 +464,13 @@ The `use()` plugin API relies on JS dynamic dispatch. We'll defer the plugin sys
 
 ```bash
 # Convert a markdown string
-./markdown_it_yo "# Hello **world**"
+./markdown-it-yo "# Hello **world**"
 
 # Convert a file
-./markdown_it_yo input.md
+./markdown-it-yo input.md
 
 # Read from stdin (pipe)
-cat README.md | ./markdown_it_yo
+cat README.md | ./markdown-it-yo
 ```
 
 This enables easy manual testing during development: write markdown, see HTML output, compare against `npx markdown-it`.
@@ -479,7 +479,7 @@ This enables easy manual testing during development: write markdown, see HTML ou
 
 ```bash
 # Build library + CLI
-cd /path/to/markdown_it_yo
+cd /path/to/markdown-it-yo
 yo build
 
 # Run CLI
@@ -490,7 +490,7 @@ yo build test
 
 # Run specific test file (during development, from Yo repo)
 cd /path/to/Yo
-./yo-cli test /path/to/markdown_it_yo/tests/token.test.yo --bail -v
+./yo-cli test /path/to/markdown-it-yo/tests/token.test.yo --bail -v
 
 # Native benchmark
 yo build run -- --benchmark
@@ -501,7 +501,7 @@ yo build -Dtarget=wasm-wasi
 
 # Compare benchmarks
 node benchmark/bench_runner.js  # markdown-it (JS)
-./benchmark/bench               # markdown_it_yo (native)
+./benchmark/bench               # markdown-it-yo (native)
 ```
 
 ---
@@ -549,7 +549,7 @@ Several modules built during this port are general-purpose and could be upstream
 | `src/unicode/categories.yo` | Enhance `std/data/rune` | Unicode Punctuation/Space category ranges complement the existing `is_whitespace()`, `is_digit()`, etc. on `rune`. |
 | Fixture test parser | `std/testing` | Generic "input `.` expected output" fixture runner could benefit other Yo projects. |
 
-**Strategy:** Build them within `markdown_it_yo/src/` first, validate through the full test suite, then propose PRs to upstream them into Yo's `std/`.
+**Strategy:** Build them within `markdown-it-yo/src/` first, validate through the full test suite, then propose PRs to upstream them into Yo's `std/`.
 
 ---
 
