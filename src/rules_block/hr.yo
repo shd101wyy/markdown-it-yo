@@ -10,38 +10,38 @@ import("std/string");
 { is_space, byte_str_slice } :: import("../common/utils.yo");
 
 // Horizontal rule block rule
-hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+hr :: (fn(state : *StateBlock, start_line : i32, end_line : i32, silent : bool) -> bool)({
   (max : i32) = state.*.e_marks(usize(start_line));
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
+  if((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4), {
     return(false);
   });
 
-  (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
+  (mut(pos) : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
 
-  (marker : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
+  (marker : i32) = i32(state.*.src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
   // Check hr marker: * - _
-  if(((marker != i32(0x2A)) && ((marker != i32(0x2D)) && (marker != i32(0x5F)))), {
+  if((marker != i32(0x2A)) && ((marker != i32(0x2D)) && (marker != i32(0x5F))), {
     return(false);
   });
 
   // markers can be mixed with spaces, but there should be at least 3 of them
-  (cnt : i32) = i32(1);
-  while((pos < max), {
-    (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
+  (mut(cnt) : i32) = i32(1);
+  while(pos < max, {
+    (ch : i32) = i32(state.*.src_bytes.bytes(usize(pos)));
     pos = (pos + i32(1));
-    if(((ch != marker) && (!(is_space(ch)))), {
+    if((ch != marker) && !is_space(ch), {
       return(false);
     });
-    if((ch == marker), {
+    if(ch == marker, {
       cnt = (cnt + i32(1));
     });
   });
 
-  if((cnt < i32(3)), {
+  if(cnt < i32(3), {
     return(false);
   });
 
@@ -54,12 +54,12 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
   // Use a str slice of the source line as markup (zero-copy).
   // The source text contains the marker characters (possibly mixed with spaces).
   (markup_start : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
-  (markup : str) = byte_str_slice(state.*._src_bytes, markup_start, state.*.e_marks(usize(start_line)));
+  (markup : str) = byte_str_slice(state.*.src_bytes, markup_start, state.*.e_marks(usize(start_line)));
 
-  (token : Token) = Token.new(.TT_HR, "hr", i32(0));
+  (mut(token) : Token) = Token.new(.TT_HR, "hr", i32(0));
   token.block = true;
   token.markup = markup;
-  token.map = .Some(MapRange(begin: start_line, end: state.*.line));
+  token.map = .Some(MapRange(begin : start_line, end : state.*.line));
   block_push_token(state, token);
 
   true

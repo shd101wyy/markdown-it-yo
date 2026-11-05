@@ -15,12 +15,12 @@ pragma(Pragma.AllowUnsafe);
 { StateCore } :: import("./state_core.yo");
 
 // Check if a rune is ASCII whitespace (space, tab, LF, CR)
-_is_whitespace :: (fn(ch: rune) -> bool)(
+_is_whitespace :: (fn(ch : rune) -> bool)(
   (((ch == rune(u32(' '))) || (ch == rune(u32('\t')))) || ((ch == rune(u32('\n'))) || (ch == rune(u32('\r')))))
 );
 
 // Check if content contains scoped abbreviation patterns: (c), (r), (tm) case-insensitive
-_has_scoped_abbr :: (fn(content: str) -> bool)({
+_has_scoped_abbr :: (fn(content : str) -> bool)({
   (content_s : String) = byte_substring(content, i32(0), i32(content.len()));
   (has_c : bool) = content_s.contains(`(c)`);
   (has_C : bool) = content_s.contains(`(C)`);
@@ -34,7 +34,7 @@ _has_scoped_abbr :: (fn(content: str) -> bool)({
 });
 
 // Check if content contains rare typographic sequences
-_has_rare_chars :: (fn(content: str) -> bool)({
+_has_rare_chars :: (fn(content : str) -> bool)({
   (content_s : String) = byte_substring(content, i32(0), i32(content.len()));
   (has_pm : bool) = content_s.contains(`+-`);
   (has_dots : bool) = content_s.contains(`..`);
@@ -46,31 +46,32 @@ _has_rare_chars :: (fn(content: str) -> bool)({
 });
 
 // Replace scoped abbreviations: (c)→©, (C)→©, (r)→®, (R)→®, (tm)→™, etc.
-_replace_scoped_abbrs :: (fn(content: String) -> String)({
+_replace_scoped_abbrs :: (fn(content : String) -> String)({
   (copyright : String) = from_code_point(i32(0xA9));
   (registered : String) = from_code_point(i32(0xAE));
   (trademark : String) = from_code_point(i32(0x2122));
-  (result : String) = content;
-  result = result.replace_all(`(c)`, copyright);
-  result = result.replace_all(`(C)`, copyright);
-  result = result.replace_all(`(r)`, registered);
-  result = result.replace_all(`(R)`, registered);
-  result = result.replace_all(`(tm)`, trademark);
-  result = result.replace_all(`(TM)`, trademark);
-  result = result.replace_all(`(Tm)`, trademark);
-  result = result.replace_all(`(tM)`, trademark);
+  (mut(result) : String) = content;
+  result = result.replace_all(`(c)`, &copyright);
+  result = result.replace_all(`(C)`, &copyright);
+  result = result.replace_all(`(r)`, &registered);
+  result = result.replace_all(`(R)`, &registered);
+  result = result.replace_all(`(tm)`, &trademark);
+  result = result.replace_all(`(TM)`, &trademark);
+  result = result.replace_all(`(Tm)`, &trademark);
+  result = result.replace_all(`(tM)`, &trademark);
   result
 });
 
 // Collapse runs of 2+ dots into a single ellipsis character (U+2026)
-_collapse_dots :: (fn(content: String) -> String)({
-  (bytes : ArrayList(u8)) = content.as_bytes();
+_collapse_dots :: (fn(content : String) -> String)({
+  (bytes : ArrayList(u8)) = content.to_bytes();
   (len : usize) = bytes.len();
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
-  (i : usize) = usize(0);
-  (run_start : usize) = usize(0);
+  (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (mut(i) : usize) = usize(0);
+  (mut(run_start) : usize) = usize(0);
 
-  match(bytes.ptr(),
+  match(
+    bytes.ptr(),
     .Some(src_ptr) => {
       while((i < len), {
         if(((src_ptr.add(i)).* == u8(0x2E)), {
@@ -106,14 +107,15 @@ _collapse_dots :: (fn(content: String) -> String)({
 });
 
 // Collapse runs of 4+ ? or ! into 3 of the same character
-_collapse_excl_question :: (fn(content: String) -> String)({
-  (bytes : ArrayList(u8)) = content.as_bytes();
+_collapse_excl_question :: (fn(content : String) -> String)({
+  (bytes : ArrayList(u8)) = content.to_bytes();
   (len : usize) = bytes.len();
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
-  (i : usize) = usize(0);
-  (run_start : usize) = usize(0);
+  (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (mut(i) : usize) = usize(0);
+  (mut(run_start) : usize) = usize(0);
 
-  match(bytes.ptr(),
+  match(
+    bytes.ptr(),
     .Some(src_ptr) => {
       while((i < len), {
         (b : u8) = (src_ptr.add(i)).*;
@@ -132,7 +134,7 @@ _collapse_excl_question :: (fn(content: String) -> String)({
             out.push(b);
             out.push(b);
           }, {
-            (j : usize) = usize(0);
+            (mut(j) : usize) = usize(0);
             while((j < run_len), {
               out.push(b);
               j = (j + usize(1));
@@ -154,14 +156,15 @@ _collapse_excl_question :: (fn(content: String) -> String)({
 });
 
 // Collapse runs of 2+ commas into a single comma
-_collapse_commas :: (fn(content: String) -> String)({
-  (bytes : ArrayList(u8)) = content.as_bytes();
+_collapse_commas :: (fn(content : String) -> String)({
+  (bytes : ArrayList(u8)) = content.to_bytes();
   (len : usize) = bytes.len();
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
-  (i : usize) = usize(0);
-  (run_start : usize) = usize(0);
+  (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (mut(i) : usize) = usize(0);
+  (mut(run_start) : usize) = usize(0);
 
-  match(bytes.ptr(),
+  match(
+    bytes.ptr(),
     .Some(src_ptr) => {
       while((i < len), {
         if(((src_ptr.add(i)).* == u8(0x2C)), {
@@ -194,18 +197,19 @@ _collapse_commas :: (fn(content: String) -> String)({
 // En-dash rule 7: (^|\s)--(?=\s|$)       with multiline
 // En-dash rule 8: (^|[^-\s])--(?=[^-\s]|$) with multiline
 // Check if byte is ASCII whitespace
-_is_ws_byte :: (fn(b: u8) -> bool)(
+_is_ws_byte :: (fn(b : u8) -> bool)(
   (((b == u8(0x20)) || (b == u8(0x09))) || ((b == u8(0x0A)) || (b == u8(0x0D))))
 );
 
-_replace_dashes :: (fn(content: String) -> String)({
-  (bytes : ArrayList(u8)) = content.as_bytes();
+_replace_dashes :: (fn(content : String) -> String)({
+  (bytes : ArrayList(u8)) = content.to_bytes();
   (len : usize) = bytes.len();
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
-  (i : usize) = usize(0);
-  (run_start : usize) = usize(0);
+  (mut(out) : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (mut(i) : usize) = usize(0);
+  (mut(run_start) : usize) = usize(0);
 
-  match(bytes.ptr(),
+  match(
+    bytes.ptr(),
     .Some(src_ptr) => {
       while((i < len), {
         if(((src_ptr.add(i)).* == u8(0x2D)), {
@@ -259,7 +263,7 @@ _replace_dashes :: (fn(content: String) -> String)({
               });
             },
             true => {
-              (d : usize) = usize(0);
+              (mut(d) : usize) = usize(0);
               while((d < dash_count), {
                 out.push(u8(0x2D));
                 d = (d + usize(1));
@@ -282,12 +286,12 @@ _replace_dashes :: (fn(content: String) -> String)({
 });
 
 // Apply all rare character replacements in the correct order
-_replace_rare :: (fn(content: String) -> String)({
+_replace_rare :: (fn(content : String) -> String)({
   (plus_minus : String) = from_code_point(i32(0xB1));
   (ellipsis : String) = from_code_point(i32(0x2026));
 
   // Step 1: +- → ±
-  (result : String) = content.replace_all(`+-`, plus_minus);
+  (mut(result) : String) = content.replace_all(`+-`, &plus_minus);
   // Step 2: 2+ consecutive dots → …
   result = _collapse_dots(result);
   // Step 3: ?… → ?.., !… → !..
@@ -304,16 +308,16 @@ _replace_rare :: (fn(content: String) -> String)({
 
 // Iterate inline children in reverse, replace scoped abbreviations in text tokens,
 // skipping tokens inside autolinks.
-_replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
-  (inside_autolink : i32) = i32(0);
-  (i : i32) = (i32(inline_tokens.len()) - i32(1));
+_replace_scoped :: (fn(inline_tokens : &mut ArrayList(Token)) -> unit)({
+  (mut(inside_autolink) : i32) = i32(0);
+  (mut(i) : i32) = (i32(inline_tokens.len()) - i32(1));
   while((i >= i32(0)), {
-    (token : *(Token)) = &(inline_tokens(usize(i)));
+    (token : *(Token)) = addr_of((inline_tokens(usize(i))));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
       (replaced : String) = _replace_scoped_abbrs(content_s);
-      token.*.content = str_view(replaced);
-      token.*._content_owned = .Some(replaced);
+      token.*.content = str_view(&replaced);
+      token.*.content_owned = .Some(replaced);
     });
     if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == "auto")), {
       inside_autolink = (inside_autolink - i32(1));
@@ -327,17 +331,17 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
 
 // Iterate inline children in reverse, replace rare sequences in text tokens,
 // skipping tokens inside autolinks.
-_replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
-  (inside_autolink : i32) = i32(0);
-  (i : i32) = (i32(inline_tokens.len()) - i32(1));
+_replace_rare_tokens :: (fn(inline_tokens : &mut ArrayList(Token)) -> unit)({
+  (mut(inside_autolink) : i32) = i32(0);
+  (mut(i) : i32) = (i32(inline_tokens.len()) - i32(1));
   while((i >= i32(0)), {
-    (token : *(Token)) = &(inline_tokens(usize(i)));
+    (token : *(Token)) = addr_of((inline_tokens(usize(i))));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       if(_has_rare_chars(token.*.content), {
         (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
         (replaced : String) = _replace_rare(content_s);
-        token.*.content = str_view(replaced);
-        token.*._content_owned = .Some(replaced);
+        token.*.content = str_view(&replaced);
+        token.*.content_owned = .Some(replaced);
       });
     });
     if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == "auto")), {
@@ -351,13 +355,15 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
 });
 
 // Main replacements rule — iterate block tokens in reverse, process inline tokens.
-replacements :: (fn(state: *(StateCore)) -> unit)({
-  (block_tokens : ArrayList(Token)) = state.*.tokens;
-  (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
+replacements :: (fn(state : *(StateCore)) -> unit)({
+  block_tokens := &mut state.*.tokens;
+  (mut(blk_idx) : i32) = (i32(block_tokens.len()) - i32(1));
   while((blk_idx >= i32(0)), {
-    (block_tok : *(Token)) = &(block_tokens(usize(blk_idx)));
+    (block_tok : *(Token)) = addr_of((block_tokens(usize(blk_idx))));
     if((block_tok.*.type_name == .TT_INLINE), {
-      match(block_tok.*.children,
+      children_place := &mut block_tok.*.children;
+      match(
+        children_place,
         .Some(children) => {
           if(_has_scoped_abbr(block_tok.*.content), {
             _replace_scoped(children);

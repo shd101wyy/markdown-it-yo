@@ -9,7 +9,7 @@
 { Options, default_options } :: import("../src/options.yo");
 
 main :: (fn() -> unit)({
-  println(`=== markdown_it_yo end-to-end tests ===`);
+  println(`=== markdown-it-yo end-to-end tests ===`);
 
   // Test 1: Empty input
   {
@@ -129,7 +129,7 @@ main :: (fn() -> unit)({
 
   // Test 15: HTML inline (with html enabled)
   {
-    (opts : Options) = default_options();
+    (mut(opts) : Options) = default_options();
     opts.html = true;
     (md : MarkdownIt) = new_markdown_it_with_options(opts);
     (result : String) = md.render_src(`text <b>bold</b> text`);
@@ -483,7 +483,7 @@ main :: (fn() -> unit)({
 
   // Test 59: HTML block with html enabled
   {
-    (opts : Options) = default_options();
+    (mut(opts) : Options) = default_options();
     opts.html = true;
     (md : MarkdownIt) = new_markdown_it_with_options(opts);
     (result : String) = md.render_src(String.from("<div>\nhello\n</div>"));

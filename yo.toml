@@ -1,11 +1,11 @@
 [package]
-name = "markdown_it_yo"
+name = "markdown-it-yo"
 version = "0.0.1"
 description = "A markdown-it style Markdown parser written in Yo"
 license = "MIT"
 
 [modules]
-# `import("markdown_it_yo")` — the module root moved here from `build.module`,
+# `import("markdown-it-yo")` — the module root moved here from `build.module`,
 # which no longer takes one.
 default = "src/lib.yo"
 

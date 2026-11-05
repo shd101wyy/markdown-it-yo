@@ -10,19 +10,19 @@ pragma(Pragma.AllowUnsafe);
 { str_view } :: import("../common/utils.yo");
 
 // Indented code block rule
-code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) < i32(4)), {
+code :: (fn(state : *StateBlock, start_line : i32, end_line : i32, silent : bool) -> bool)({
+  if((state.*.s_count(usize(start_line)) - state.*.blk_indent) < i32(4), {
     return(false);
   });
 
-  (next_line : i32) = (start_line + i32(1));
-  (last : i32) = next_line;
+  (mut(next_line) : i32) = (start_line + i32(1));
+  (mut(last) : i32) = next_line;
 
-  while((next_line < end_line), {
+  while(next_line < end_line, {
     if(state.*.is_empty(next_line), {
       next_line = (next_line + i32(1));
     }, {
-      if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
+      if((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4), {
         next_line = (next_line + i32(1));
         last = next_line;
       }, {
@@ -35,13 +35,13 @@ code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
   state.*.line = last;
 
-  (token : Token) = Token.new(.TT_CODE_BLOCK, "code", i32(0));
-  (lines : String) = state.*.get_lines(start_line, last, (i32(4) + state.*.blk_indent), false);
+  (mut(token) : Token) = Token.new(.TT_CODE_BLOCK, "code", i32(0));
+  (mut(lines) : String) = state.*.get_lines(start_line, last, i32(4) + state.*.blk_indent, false);
   lines.push_byte(u8(0x0A));
-  token.content = str_view(lines);
-  token._content_owned = .Some(lines);
+  token.content = str_view(&lines);
+  token.content_owned = .Some(lines);
   token.block = true;
-  token.map = .Some(MapRange(begin: start_line, end: state.*.line));
+  token.map = .Some(MapRange(begin : start_line, end : state.*.line));
   block_push_token(state, token);
 
   true

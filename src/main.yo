@@ -9,26 +9,42 @@ pragma(Pragma.AllowUnsafe);
 { println, print } :: import("std/fmt");
 { ArrayList } :: import("std/collections/array_list");
 { args } :: import("std/env");
-{ stdin, stdout, stderr, fopen, fclose, fread, fwrite, fputs,
-  fseek, ftell, SEEK_SET, SEEK_END, FILE } :: import("std/libc/stdio");
+{
+  stdin,
+  stdout,
+  stderr,
+  fopen,
+  fclose,
+  fread,
+  fwrite,
+  fputs,
+  fseek,
+  ftell,
+  SEEK_SET,
+  SEEK_END,
+  FILE
+} :: import("std/libc/stdio");
 
 { MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("./markdown_it.yo");
 { Options, default_options, commonmark_options } :: import("./options.yo");
 
 // For Unicode-aware towlower/towupper (used by normalize_reference)
-c_include("<locale.h>",
-  setlocale : (fn(category : i32, locale : *(u8)) -> *(u8))
+c_include(
+  "<locale.h>",
+  setlocale : (fn(category : i32, locale : *u8) -> *u8)
 );
 
 // Read entire file contents into a String using libc
-_read_file :: (fn(path: String) -> Option(String))({
+_read_file :: (fn(path : String) -> Option(String))({
   cstr := path.to_cstr();
-  (fp : ?(*(FILE))) = match(cstr.ptr(),
-    .Some(p) => unsafe(fopen(*(char)(p), *(char)(*(u8)("r")))),
+  (fp : ?*FILE) = match(
+    cstr.ptr(),
+    .Some(p) => unsafe(fopen((*char)(p), (*char)((*u8)("r")))),
     .None => .None
   );
 
-  match(fp,
+  match(
+    fp,
     .None => .None,
     .Some(f) => {
       // Get file size
@@ -36,30 +52,32 @@ _read_file :: (fn(path: String) -> Option(String))({
       (size : int) = unsafe(ftell(f));
       _ := unsafe(fseek(f, int(0), SEEK_SET));
 
-      if((size <= int(0)), {
+      if(size <= int(0), {
         _ := unsafe(fclose(f));
         return(.Some(String.new()));
       });
 
       // Allocate buffer and read
-      buf := ArrayList(u8).with_capacity(usize(size));
-      (i : int) = int(0);
-      while((i < size), {
+      mut(buf) := ArrayList(u8).with_capacity(usize(size));
+      (mut(i) : int) = int(0);
+      while(i < size, {
         _ := buf.push(u8(0));
         i = (i + int(1));
       });
 
-      (n : usize) = match(buf.ptr(),
-        .Some(p) => unsafe(fread(*(void)(p), usize(1), usize(size), f)),
+      (n : usize) = match(
+        buf.ptr(),
+        .Some(p) => unsafe(fread((*void)(p), usize(1), usize(size), f)),
         .None => usize(0)
       );
       _ := unsafe(fclose(f));
 
       // Trim buffer to actual bytes read
-      result := ArrayList(u8).with_capacity(n);
-      (j : usize) = usize(0);
-      while((j < n), {
-        match(buf.get(j),
+      mut(result) := ArrayList(u8).with_capacity(n);
+      (mut(j) : usize) = usize(0);
+      while(j < n, {
+        match(
+          buf.get(j),
           .Some(b) => {
             _ := result.push(b);
           },
@@ -74,26 +92,28 @@ _read_file :: (fn(path: String) -> Option(String))({
 
 // Read all of stdin into a String
 _read_stdin :: (fn() -> String)({
-  buf := ArrayList(u8).with_capacity(usize(4096));
-  chunk := ArrayList(u8).with_capacity(usize(4096));
+  mut(buf) := ArrayList(u8).with_capacity(usize(4096));
+  mut(chunk) := ArrayList(u8).with_capacity(usize(4096));
   // Fill chunk with zeros
-  (i : usize) = usize(0);
-  while((i < usize(4096)), {
+  (mut(i) : usize) = usize(0);
+  while(i < usize(4096), {
     _ := chunk.push(u8(0));
     i = (i + usize(1));
   });
 
   while(runtime(true), {
-    (n : usize) = match(chunk.ptr(),
-      .Some(p) => unsafe(fread(*(void)(p), usize(1), usize(4096), stdin)),
+    (n : usize) = match(
+      chunk.ptr(),
+      .Some(p) => unsafe(fread((*void)(p), usize(1), usize(4096), stdin)),
       .None => usize(0)
     );
-    if((n == usize(0)), {
+    if(n == usize(0), {
       return(String.from_bytes(buf));
     });
-    (j : usize) = usize(0);
-    while((j < n), {
-      match(chunk.get(j),
+    (mut(j) : usize) = usize(0);
+    while(j < n, {
+      match(
+        chunk.get(j),
         .Some(b) => {
           _ := buf.push(b);
         },
@@ -107,106 +127,126 @@ _read_stdin :: (fn() -> String)({
 
 main :: (fn() -> unit)({
   // Set locale for Unicode-aware case conversion (towlower/towupper)
-  _ := unsafe(setlocale(i32(0), *(u8)("")));
+  _ := unsafe(setlocale(i32(0), (*u8)("")));
 
   argv := args();
 
   // No arguments — show help
-  if((argv.len() <= usize(1)), {
-    _ := unsafe(fputs(*(char)(*(u8)("markdown_it_yo — Markdown to HTML converter\n\nUsage:\n  markdown_it_yo [options] <file>   Render file to stdout\n  cat file.md | markdown_it_yo -     Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  --repeat N        Run N iterations (for benchmarking)\n  -h, --help        Show this help\n")), stdout));
+  if(argv.len() <= usize(1), {
+    _ := unsafe(fputs((*char)((*u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo -     Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  --repeat N        Run N iterations (for benchmarking)\n  -h, --help        Show this help\n")), stdout));
     return(());
   });
 
   // Parse flags
-  (html_enabled : bool) = false;
-  (typographer_enabled : bool) = false;
-  (no_lang_prefix : bool) = false;
-  (use_commonmark : bool) = false;
-  (file_path : Option(String)) = .None;
-  (read_from_stdin : bool) = false;
-  (repeat_count : i32) = i32(1);
+  (mut(html_enabled) : bool) = false;
+  (mut(typographer_enabled) : bool) = false;
+  (mut(no_lang_prefix) : bool) = false;
+  (mut(use_commonmark) : bool) = false;
+  (mut(file_path) : Option(String)) = .None;
+  (mut(read_from_stdin) : bool) = false;
+  (mut(repeat_count) : i32) = i32(1);
 
-  (ai : usize) = usize(1);
-  while((ai < argv.len()), {
-    (arg : String) = argv.get(ai).unwrap();
+  (mut(ai) : usize) = usize(1);
+  while(ai < argv.len(), {
+    (arg : String) = argv.get_cloned(ai).unwrap();
     cond(
       ((arg == `--help`) || (arg == `-h`)) => {
-        _ := unsafe(fputs(*(char)(*(u8)("markdown_it_yo — Markdown to HTML converter\n\nUsage:\n  markdown_it_yo [options] <file>   Render file to stdout\n  cat file.md | markdown_it_yo -   Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  --repeat N        Run N iterations (for benchmarking)\n  -h, --help        Show this help\n")), stdout));
+        _ := unsafe(fputs((*char)((*u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo -   Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  --repeat N        Run N iterations (for benchmarking)\n  -h, --help        Show this help\n")), stdout));
         return(());
       },
-      (arg == `-`) => { read_from_stdin = true; },
-      (arg == `--html`) => { html_enabled = true; },
-      (arg == `--typographer`) => { typographer_enabled = true; },
-      (arg == `--no-lang-prefix`) => { no_lang_prefix = true; },
-      (arg == `--commonmark`) => { use_commonmark = true; },
+      (arg == `-`) => {
+        read_from_stdin = true;
+      },
+      (arg == `--html`) => {
+        html_enabled = true;
+      },
+      (arg == `--typographer`) => {
+        typographer_enabled = true;
+      },
+      (arg == `--no-lang-prefix`) => {
+        no_lang_prefix = true;
+      },
+      (arg == `--commonmark`) => {
+        use_commonmark = true;
+      },
       (arg == `--repeat`) => {
         ai = (ai + usize(1));
-        if((ai < argv.len()), {
-          (nstr : String) = argv.get(ai).unwrap();
+        if(ai < argv.len(), {
+          (nstr : String) = argv.get_cloned(ai).unwrap();
           repeat_count = nstr.parse_i32().unwrap_or(i32(1));
         });
       },
-      true => { file_path = .Some(arg); }
+      true => {
+        file_path = .Some(arg);
+      }
     );
     ai = (ai + usize(1));
   });
 
-  (opts : Options) = cond(
+  (mut(opts) : Options) = cond(
     use_commonmark => commonmark_options(),
     true => default_options()
   );
-  if(html_enabled, { opts.html = true; });
+  if(html_enabled, {
+    opts.html = true;
+  });
   opts.typographer = typographer_enabled;
-  if(no_lang_prefix, { opts.lang_prefix = String.new(); });
+  if(no_lang_prefix, {
+    opts.lang_prefix = String.new();
+  });
   md := new_markdown_it_with_options(opts);
 
-  match(file_path,
+  match(
+    file_path,
     .Some(path) => {
-      match(_read_file(path),
+      match(
+        _read_file(path),
         .Some(content) => {
-          if((repeat_count > i32(1)), {
-            (ri : i32) = i32(0);
-            while((ri < repeat_count), {
-              result := md.render_src(content);
+          if(repeat_count > i32(1), {
+            (mut(ri) : i32) = i32(0);
+            while(ri < repeat_count, {
+              result := md.render_src(content.clone());
               ri = (ri + i32(1));
             });
           }, {
             result := md.render_src(content);
             cstr := result.to_cstr();
-            match(cstr.ptr(),
+            match(
+              cstr.ptr(),
               .Some(p) => {
-                _ := unsafe(fputs(*(char)(p), stdout));
+                _ := unsafe(fputs((*char)(p), stdout));
               },
               .None => ()
             );
           });
         },
         .None => {
-          _ := unsafe(fputs(*(char)(*(u8)("Error: cannot open file\n")), stderr));
+          _ := unsafe(fputs((*char)((*u8)("Error: cannot open file\n")), stderr));
         }
       );
     },
     .None => {
       if(read_from_stdin, {
         content := _read_stdin();
-        if((repeat_count > i32(1)), {
-          (ri : i32) = i32(0);
-          while((ri < repeat_count), {
-            result := md.render_src(content);
+        if(repeat_count > i32(1), {
+          (mut(ri) : i32) = i32(0);
+          while(ri < repeat_count, {
+            result := md.render_src(content.clone());
             ri = (ri + i32(1));
           });
         }, {
           result := md.render_src(content);
           cstr := result.to_cstr();
-          match(cstr.ptr(),
+          match(
+            cstr.ptr(),
             .Some(p) => {
-              _ := unsafe(fputs(*(char)(p), stdout));
+              _ := unsafe(fputs((*char)(p), stdout));
             },
             .None => ()
           );
         });
       }, {
-        _ := unsafe(fputs(*(char)(*(u8)("Error: no input file specified. Use -h for help.\n")), stderr));
+        _ := unsafe(fputs((*char)((*u8)("Error: no input file specified. Use -h for help.\n")), stderr));
       });
     }
   );

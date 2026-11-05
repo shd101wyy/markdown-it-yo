@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Benchmark: markdown-it (JS) vs markdown_it_yo (native)
+// Benchmark: markdown-it (JS) vs markdown-it-yo (native)
 //
 // Runs both implementations on sample markdown files of various sizes
 // and reports median throughput.
@@ -41,16 +41,16 @@ let wasmBinary = null;
 if (fs.existsSync(yoOutDir)) {
   for (const target of fs.readdirSync(yoOutDir)) {
     if (target.startsWith("wasm")) {
-      const candidate = path.join(yoOutDir, target, "bin", "markdown_it_yo_wasm.js");
+      const candidate = path.join(yoOutDir, target, "bin", "markdown-it-yo-wasm.js");
       if (fs.existsSync(candidate)) wasmBinary = candidate;
     } else {
-      const candidate = path.join(yoOutDir, target, "bin", "markdown_it_yo");
+      const candidate = path.join(yoOutDir, target, "bin", "markdown-it-yo");
       if (fs.existsSync(candidate)) yoBinary = candidate;
     }
   }
 }
 if (!yoBinary) {
-  console.error("ERROR: Binary not found in yo-out/*/bin/markdown_it_yo\nRun `yo build` first.");
+  console.error("ERROR: Binary not found in yo-out/*/bin/markdown-it-yo\nRun `yo build` first.");
   process.exit(1);
 }
 
@@ -159,7 +159,7 @@ function stats(times) {
 // ---------------------------------------------------------------------------
 
 console.log(`\n${"═".repeat(72)}`);
-console.log(`  markdown_it_yo Benchmark — ${WARMUP} warmup, ${ITERATIONS} iterations`);
+console.log(`  markdown-it-yo Benchmark — ${WARMUP} warmup, ${ITERATIONS} iterations`);
 if (wasmBinary) console.log(`  WASM: ${wasmBinary}`);
 console.log(`${"═".repeat(72)}\n`);
 
@@ -229,7 +229,7 @@ if (wasmBinary) {
     "  " +
     "Size".padEnd(8) +
     "markdown-it (JS)".padEnd(20) +
-    "markdown_it_yo".padEnd(20) +
+    "markdown-it-yo".padEnd(20) +
     "Speedup"
   );
   console.log(`  ${"─".repeat(56)}`);

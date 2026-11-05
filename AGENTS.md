@@ -92,16 +92,16 @@ cd /path/to/Yo
 bun run build
 
 # Run a specific test file
-./yo-cli test /path/to/markdown_it_yo/tests/token.test.yo --bail -v
+./yo-cli test /path/to/markdown-it-yo/tests/token.test.yo --bail -v
 
 # Compile and run the CLI
-./yo-cli compile /path/to/markdown_it_yo/src/main.yo --release -o markdown_it_yo && ./markdown_it_yo
+./yo-cli compile /path/to/markdown-it-yo/src/main.yo --release -o markdown-it-yo && ./markdown-it-yo
 
 # Emit C only (for debugging)
-./yo-cli compile /path/to/markdown_it_yo/src/main.yo --emit-c --skip-c-compiler --release
+./yo-cli compile /path/to/markdown-it-yo/src/main.yo --emit-c --skip-c-compiler --release
 
 # Run with AddressSanitizer
-./yo-cli compile /path/to/markdown_it_yo/src/main.yo --release --sanitize address --allocator libc -o test && ./test
+./yo-cli compile /path/to/markdown-it-yo/src/main.yo --release --sanitize address --allocator libc -o test && ./test
 ```
 
 ---

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Compare markdown_it_yo CLI output against markdown-it JS for fixture files.
+// Compare markdown-it-yo CLI output against markdown-it JS for fixture files.
 // Usage: node scripts/fixture_compare.js <fixture_file> [--verbose]
 //
 // Fixture format (markdown-it style):

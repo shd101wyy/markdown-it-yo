@@ -11,6 +11,7 @@ StringPair :: struct(
   name : String,
   value : String
 );
+derive(StringPair, Clone);
 
 // Token type enum — replaces string type_name for zero-allocation dispatch
 TokenType :: enum(
@@ -59,17 +60,22 @@ TokenType :: enum(
   TT_S_CLOSE,
   TT_INLINE
 );
+derive(TokenType, Copy, Clone);
 
-impl(TokenType, Eq(TokenType)(
-  (==) : ((lhs, rhs) -> (i32(lhs) == i32(rhs))),
-  (!=) : ((lhs, rhs) -> (i32(lhs) != i32(rhs)))
-));
+impl(
+  TokenType,
+  Eq(TokenType)(
+    (==) : ((lhs, rhs) -> (i32(lhs.*) == i32(rhs.*))),
+    (!=) : ((lhs, rhs) -> (i32(lhs.*) != i32(rhs.*)))
+  )
+);
 
 // Source map range: [line_begin, line_end]
 MapRange :: struct(
   begin : i32,
   end : i32
 );
+derive(MapRange, Copy, Clone);
 
 // Token class
 //
@@ -77,88 +83,77 @@ MapRange :: struct(
 Token :: struct(
   // Type of the token (enum for fast dispatch)
   type_name : TokenType,
-
   // HTML tag name, e.g. "p"
   tag : str,
-
   // Html attributes. Format: [ [name1, value1], [name2, value2] ]
   attrs : Option(ArrayList(StringPair)),
-
   // Source map info. Format: [line_begin, line_end]
   map : Option(MapRange),
-
   // Level change (number in {-1, 0, 1} set), where:
   //   1 means the tag is opening
   //   0 means the tag is self-closing
   //  -1 means the tag is closing
   nesting : i32,
-
   // nesting level, the same as `state.level`
   level : i32,
-
   // An array of child nodes (inline and img tokens)
   children : Option(ArrayList(Self)),
-
   // In a case of self-closing tag (code, html, fence, etc.),
   // it has contents of this tag.
-  // Non-owning str slice — typically points into source text or _content_owned.
+  // Non-owning str slice — typically points into source text or content_owned.
   content : str,
-
   // Backing storage for computed content that doesn't come from source text.
   // When set, `content` is a str view into this String.
-  _content_owned : Option(String),
-
+  content_owned : Option(String),
   // '*' or '_' for emphasis, fence string for fence, etc.
   // Non-owning str slice — typically points into source text or static memory.
   markup : str,
-
   // Additional information:
   //  - Info string for "fence" tokens
   //  - The value "auto" for autolink "link_open" and "link_close" tokens
   //  - The string value of the item marker for ordered-list "list_item_open" tokens
   // Non-owning str slice — typically points into source text or static memory.
   info : str,
-
   // True for block-level tokens, false for inline tokens.
   // Used in renderer to calculate line breaks
   block : bool,
-
   // If it's true, ignore this element when rendering. Used for tight lists
   // to hide paragraphs.
   hidden : bool
 );
+derive(Token, Clone);
 
-impl(Token,
+impl(
+  Token,
   // Create new token and fill passed properties.
-  new : (fn(type_name: TokenType, tag: str, nesting: i32) -> Self)(
+  new : (fn(type_name : TokenType, tag : str, nesting : i32) -> Self)(
     Self(
-      type_name: type_name,
-      tag: tag,
-      attrs: .None,
-      map: .None,
-      nesting: nesting,
-      level: i32(0),
-      children: .None,
-      content: "",
-      _content_owned: .None,
-      markup: "",
-      info: "",
-      block: false,
-      hidden: false
+      type_name : type_name,
+      tag : tag,
+      attrs : .None,
+      map : .None,
+      nesting : nesting,
+      level : i32(0),
+      children : .None,
+      content : "",
+      content_owned : .None,
+      markup : "",
+      info : "",
+      block : false,
+      hidden : false
     )
   ),
-
   // Search attribute index by name.
-  attr_index : (fn(self: *(Self), name: String) -> i32)(
-    match(self.*.attrs,
+  attr_index : (fn(self : *(Self), name : &String) -> i32)(
+    match(
+      &self.*.attrs,
       .None => i32(-1),
       .Some(attrs) => {
-        (i : i32) = i32(0);
+        (mut(i) : i32) = i32(0);
         (len : i32) = i32(attrs.len());
-        (result : i32) = i32(-1);
+        (mut(result) : i32) = i32(-1);
         while(((i < len) && (result == i32(-1))), {
-          (pair : StringPair) = attrs(usize(i));
-          if((pair.name == name), {
+          if((attrs(usize(i)).name == name.*), {
             result = i;
           });
           i = (i + i32(1));
@@ -167,46 +162,48 @@ impl(Token,
       }
     )
   ),
-
   // Add [name, value] attribute to list. Init attrs if necessary.
-  attr_push : (fn(self: *(Self), attr_data: StringPair) -> unit)({
-    match(self.*.attrs,
-      .Some(attrs) => {
+  attr_push : (fn(self : *(Self), attr_data : StringPair) -> unit)({
+    attrs_place := &mut self.*.attrs;
+    match(
+      attrs_place,
+      .Some(mut(attrs)) => {
         attrs.push(attr_data);
       },
       .None => {
-        (new_attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
+        (mut(new_attrs) : ArrayList(StringPair)) = ArrayList(StringPair).new();
         new_attrs.push(attr_data);
         self.*.attrs = .Some(new_attrs);
       }
     );
   }),
-
   // Set `name` attribute to `value`. Override old value if exists.
-  attr_set : (fn(self: *(Self), name: String, value: String) -> unit)({
-    (idx : i32) = self.attr_index(name);
-    (attr_data : StringPair) = StringPair(name: name, value: value);
+  attr_set : (fn(self : *(Self), name : String, value : String) -> unit)({
+    (idx : i32) = self.attr_index(&name);
+    (attr_data : StringPair) = StringPair(name : name, value : value);
 
     if((idx < i32(0)), {
       self.attr_push(attr_data);
     }, {
-      match(self.*.attrs,
-        .Some(attrs) => {
-          &(attrs(usize(idx))).* = attr_data;
+      attrs_place := &mut self.*.attrs;
+      match(
+        attrs_place,
+        .Some(mut(attrs)) => {
+          attrs(usize(idx)) = attr_data;
         },
         .None => ()
       );
     });
   }),
-
   // Get the value of attribute `name`, or .None if it does not exist.
-  attr_get : (fn(self: *(Self), name: String) -> Option(String))({
-    (idx : i32) = self.attr_index(name);
+  attr_get : (fn(self : *(Self), name : String) -> Option(String))({
+    (idx : i32) = self.attr_index(&name);
     cond(
-      (idx >= i32(0)) => match(self.*.attrs,
+      (idx >= i32(0)) => match(
+        &self.*.attrs,
         .Some(attrs) => {
-          (pair : StringPair) = attrs.get(usize(idx)).unwrap();
-          (result : Option(String)) = .Some(pair.value);
+          (pair : StringPair) = attrs.get_cloned(usize(idx)).unwrap();
+          (result : Option(String)) = .Some(pair.value.clone());
           result
         },
         .None => {
@@ -220,21 +217,22 @@ impl(Token,
       }
     )
   }),
-
   // Join value to existing attribute via space. Or create a new attribute if not
   // exists. Useful to operate with token classes.
-  attr_join : (fn(self: *(Self), name: String, value: String) -> unit)({
-    (idx : i32) = self.attr_index(name);
+  attr_join : (fn(self : *(Self), name : String, value : String) -> unit)({
+    (idx : i32) = self.attr_index(&name);
 
     if((idx < i32(0)), {
-      self.attr_push(StringPair(name: name, value: value));
+      self.attr_push(StringPair(name : name, value : value));
     }, {
-      match(self.*.attrs,
-        .Some(attrs) => {
-          (existing : StringPair) = attrs.get(usize(idx)).unwrap();
-          &(attrs(usize(idx))).* = StringPair(
-            name: name,
-            value: `${existing.value} ${value}`
+      attrs_place := &mut self.*.attrs;
+      match(
+        attrs_place,
+        .Some(mut(attrs)) => {
+          (existing : StringPair) = attrs.get_cloned(usize(idx)).unwrap();
+          attrs(usize(idx)) = StringPair(
+            name : name,
+            value : `${existing.value} ${value}`
           );
           ();
         },

@@ -1,8 +1,8 @@
-# markdown_it_yo
+# markdown-it-yo
 
 A high-performance Markdown parser written in [Yo](https://github.com/shd101wyy/yo) programming language — a direct 1:1 port of the popular [markdown-it](https://github.com/markdown-it/markdown-it) JavaScript library.
 
-> **See also:** [markdown_yo](https://github.com/shd101wyy/markdown_yo) — a custom implementation inspired by markdown-it, [md4c](https://github.com/mity/md4c), and [markdown-wasm](https://github.com/shd101wyy/markdown-wasm), optimized for speed. markdown_it_yo faithfully mirrors the original JS architecture for easier maintenance, while markdown_yo is a **ground-up rewrite** for maximum performance.
+> **See also:** [markdown-yo](https://github.com/shd101wyy/markdown-yo) — a custom implementation inspired by markdown-it, [md4c](https://github.com/mity/md4c), and [markdown-wasm](https://github.com/shd101wyy/markdown-wasm), optimized for speed. markdown-it-yo faithfully mirrors the original JS architecture for easier maintenance, while markdown_yo is a **ground-up rewrite** for maximum performance.
 
 ## Features
 
@@ -26,14 +26,14 @@ yo build wasm     # Build WASM target (requires emscripten)
 
 ## Use as a library
 
-`markdown_it_yo` is a Yo package, so add it and import it by name — no paths:
+`markdown-it-yo` is a Yo package, so add it and import it by name — no paths:
 
 ```bash
-yo add shd101wyy/markdown_it_yo
+yo add shd101wyy/markdown-it-yo
 ```
 
 ```rust
-{ new_markdown_it } :: import("markdown_it_yo");
+{ new_markdown_it } :: import("markdown-it-yo");
 { println } :: import("std/fmt");
 
 main :: (fn() -> unit)({
@@ -55,9 +55,9 @@ For non-default behaviour, build the `Options` first — the same options the CL
 flags below set:
 
 ```rust
-{ new_markdown_it_with_options, default_options, commonmark_options, Options } :: import("markdown_it_yo");
+{ new_markdown_it_with_options, default_options, commonmark_options, Options } :: import("markdown-it-yo");
 
-(opts : Options) = default_options();
+(mut(opts) : Options) = default_options();
 opts.html = true;
 opts.typographer = true;
 md := new_markdown_it_with_options(opts);
@@ -67,15 +67,15 @@ md := new_markdown_it_with_options(opts);
 
 ```bash
 # Read from stdin
-echo "# Hello **World**" | ./yo-out/$TARGET/bin/markdown_it_yo -
+echo "# Hello **World**" | ./yo-out/$TARGET/bin/markdown-it-yo -
 
 # Read from file
-./yo-out/$TARGET/bin/markdown_it_yo README.md
+./yo-out/$TARGET/bin/markdown-it-yo README.md
 
 # CLI options
-./yo-out/$TARGET/bin/markdown_it_yo --html --typographer input.md
-./yo-out/$TARGET/bin/markdown_it_yo --commonmark input.md
-./yo-out/$TARGET/bin/markdown_it_yo --no-lang-prefix input.md
+./yo-out/$TARGET/bin/markdown-it-yo --html --typographer input.md
+./yo-out/$TARGET/bin/markdown-it-yo --commonmark input.md
+./yo-out/$TARGET/bin/markdown-it-yo --no-lang-prefix input.md
 ```
 
 ### CLI Flags
@@ -183,7 +183,7 @@ V8's generational GC handles short-lived objects nearly for free (young generati
 
 For WASM, the `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance. The `-sENVIRONMENT=node` flag strips unused browser glue code. Pre-allocating 64MB initial memory (`-sINITIAL_MEMORY=64MB`) eliminates expensive memory growth events for small/medium inputs — each growth copies the entire linear memory, costing ~2-5ms. WASM now matches or beats JS at all input sizes (1.0–1.1×).
 
-See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a **ground-up rewrite** using a SAX architecture with value-type tokens, targeting 2-5× faster than JS.
+See [markdown-yo](https://github.com/shd101wyy/markdown-yo) for a **ground-up rewrite** using a SAX architecture with value-type tokens, targeting 2-5× faster than JS.
 
 ### Verifying Correctness
 
@@ -199,7 +199,7 @@ diff /tmp/yo.html /tmp/js.html  # Should produce no output
 ## Project Structure
 
 ```
-markdown_it_yo/
+markdown-it-yo/
 ├── build.yo              # Build system configuration
 ├── src/
 │   ├── main.yo           # CLI entry point

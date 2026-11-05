@@ -23,28 +23,28 @@ HtmlRegexPatterns :: struct(
   HTML_OPEN_CLOSE_TAG_RE_STR : String
 );
 
-html_re :: (fn() -> HtmlRegexPatterns)(
-  {
-    attr_value := `(?:${unquoted}|${single_quoted}|${double_quoted})`;
-    attribute := `(?:\\s+${attr_name}(?:\\s*=\\s*${attr_value})?)`;
-    ot := `<[A-Za-z][A-Za-z0-9\\-]*${attribute}*\\s*/?>`;
-    ct := `</[A-Za-z][A-Za-z0-9\\-]*\\s*>`;
-    cm := `<!---?>|<!--(?:[^-]|-[^-]|--[^>])*-->`;
-    pr := `<[?][\\s\\S]*?[?]>`;
-    dc := `<![A-Za-z][^>]*>`;
-    cd := `<!\\[CDATA\\[[\\s\\S]*?\\]\\]>`;
+html_re :: (fn() -> HtmlRegexPatterns)({
+  attr_value := `(?:${unquoted}|${single_quoted}|${double_quoted})`;
+  attribute := `(?:\\s+${attr_name}(?:\\s*=\\s*${attr_value})?)`;
+  ot := `<[A-Za-z][A-Za-z0-9\\-]*${attribute}*\\s*/?>`;
+  ct := `</[A-Za-z][A-Za-z0-9\\-]*\\s*>`;
+  cm := `<!---?>|<!--(?:[^-]|-[^-]|--[^>])*-->`;
+  pr := `<[?][\\s\\S]*?[?]>`;
+  dc := `<![A-Za-z][^>]*>`;
+  cd := `<!\\[CDATA\\[[\\s\\S]*?\\]\\]>`;
 
-    HtmlRegexPatterns(
-      open_tag: ot,
-      close_tag: ct,
-      comment: cm,
-      processing: pr,
-      declaration: dc,
-      cdata: cd,
-      HTML_TAG_RE_STR: `^(?:${ot}|${ct}|${cm}|${pr}|${dc}|${cd})`,
-      HTML_OPEN_CLOSE_TAG_RE_STR: `^(?:${ot}|${ct})`
-    )
-  }
-);
+  tag_re := `^(?:${ot}|${ct}|${cm}|${pr}|${dc}|${cd})`;
+  open_close_re := `^(?:${ot}|${ct})`;
+  HtmlRegexPatterns(
+    open_tag : ot,
+    close_tag : ct,
+    comment : cm,
+    processing : pr,
+    declaration : dc,
+    cdata : cd,
+    HTML_TAG_RE_STR : tag_re,
+    HTML_OPEN_CLOSE_TAG_RE_STR : open_close_re
+  )
+});
 
 export(html_re, HtmlRegexPatterns);

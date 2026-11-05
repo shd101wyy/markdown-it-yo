@@ -7,11 +7,14 @@ pragma(Pragma.AllowUnsafe);
 { Url } :: import("./parse.yo");
 
 // Format a Url object back into a URL string.
-format :: (fn(url: *(Url)) -> String)({
-  (result : String) = String.new();
+format :: (fn(url : *Url) -> String)({
+  (mut(result) : String) = String.new();
 
-  match(url.*.protocol,
-    .Some(p) => { result = (result + p); },
+  match(
+    &url.*.protocol,
+    .Some(p) => {
+      result.push_string(&p.*);
+    },
     .None => ()
   );
 
@@ -19,48 +22,60 @@ format :: (fn(url: *(Url)) -> String)({
     result = (result + `//`);
   });
 
-  match(url.*.auth,
+  match(
+    &url.*.auth,
     .Some(a) => {
-      result = (result + a);
+      result.push_string(&a.*);
       result = (result + `@`);
     },
     .None => ()
   );
 
-  match(url.*.hostname,
+  match(
+    &url.*.hostname,
     .Some(h) => {
       // IPv6 address: wrap in brackets
       if(h.contains(`:`), {
         result = (result + `[`);
-        result = (result + h);
+        result.push_string(&h.*);
         result = (result + `]`);
       }, {
-        result = (result + h);
+        result.push_string(&h.*);
       });
     },
     .None => ()
   );
 
-  match(url.*.port,
+  match(
+    &url.*.port,
     .Some(p) => {
       result = (result + `:`);
-      result = (result + p);
+      result.push_string(&p.*);
     },
     .None => ()
   );
 
-  match(url.*.pathname,
-    .Some(p) => { result = (result + p); },
+  match(
+    &url.*.pathname,
+    .Some(p) => {
+      result.push_string(&p.*);
+    },
     .None => ()
   );
 
-  match(url.*.search,
-    .Some(s) => { result = (result + s); },
+  match(
+    &url.*.search,
+    .Some(s) => {
+      result.push_string(&s.*);
+    },
     .None => ()
   );
 
-  match(url.*.hash,
-    .Some(h) => { result = (result + h); },
+  match(
+    &url.*.hash,
+    .Some(h) => {
+      result.push_string(&h.*);
+    },
     .None => ()
   );
 
