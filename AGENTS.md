@@ -50,15 +50,15 @@ Input string
 | `src/token.yo`          | Token struct (parsed markdown element)             | `lib/token.mjs`                |
 | `src/ruler.yo`          | Rule chain manager (enable/disable/ordering)       | `lib/ruler.mjs`                |
 | `src/renderer.yo`       | Token stream → HTML conversion                     | `lib/renderer.mjs`             |
-| `src/markdown_it.yo`    | Main MarkdownIt entry point                        | `lib/index.mjs`                |
+| `src/markdown-it.yo`    | Main MarkdownIt entry point                        | `lib/index.mjs`                |
 | `src/parser_core.yo`    | Core pipeline orchestrator                         | `lib/parser_core.mjs`          |
-| `src/parser_block.yo`   | Block-level tokenizer                              | `lib/parser_block.mjs`         |
-| `src/parser_inline.yo`  | Inline-level tokenizer                             | `lib/parser_inline.mjs`        |
+| `src/parser-block.yo`   | Block-level tokenizer                              | `lib/parser_block.mjs`         |
+| `src/parser-inline.yo`  | Inline-level tokenizer                             | `lib/parser_inline.mjs`        |
 | `src/common/`           | Shared utilities, HTML patterns                    | `lib/common/`                  |
 | `src/helpers/`          | Link parsing helpers                               | `lib/helpers/`                 |
-| `src/rules_core/`       | 7 core rules + StateCore                           | `lib/rules_core/`              |
-| `src/rules_block/`      | 11 block rules + StateBlock                        | `lib/rules_block/`             |
-| `src/rules_inline/`     | 13 inline rules + StateInline + post-processing    | `lib/rules_inline/`            |
+| `src/rules-core/`       | 7 core rules + StateCore                           | `lib/rules_core/`              |
+| `src/rules-block/`      | 11 block rules + StateBlock                        | `lib/rules_block/`             |
+| `src/rules-inline/`     | 13 inline rules + StateInline + post-processing    | `lib/rules_inline/`            |
 | `src/presets/`           | Configuration presets (default, commonmark, zero)   | `lib/presets/`                 |
 | `src/entities/`          | HTML entity decode (replaces `entities` npm)        | *custom implementation*        |
 | `src/mdurl/`             | URL encode/decode/parse (replaces `mdurl` npm)      | *custom implementation*        |
@@ -73,7 +73,7 @@ Input string
 
 ## Translation Philosophy
 
-**Core parser files** (`token`, `ruler`, `renderer`, all `rules_*`, `parser_*`, `markdown_it`) are **near 1:1 translations** of the original JavaScript. This means:
+**Core parser files** (`token`, `ruler`, `renderer`, all `rules-*`, `parser-*`, `markdown-it`) are **near 1:1 translations** of the original JavaScript. This means:
 
 - Preserve the same function names, variable names, and control flow
 - Preserve the same algorithm structure and order of operations

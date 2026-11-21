@@ -4,11 +4,11 @@
 
 pragma(Pragma.AllowUnsafe);
 { String } :: import("std/string");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 { Regex, RegexMatch } :: import("std/regex");
-{ is_valid_entity_code, from_code_point } :: import("./char_utils.yo");
+{ is_valid_entity_code, from_code_point } :: import("./char-utils.yo");
 { html_decode } :: import("./entities.yo");
-{ to_lower_code_point, to_upper_code_point } :: import("./unicode_casefold.yo");
+{ to_lower_code_point, to_upper_code_point } :: import("./unicode-casefold.yo");
 
 // ============================================================================
 // escape_html

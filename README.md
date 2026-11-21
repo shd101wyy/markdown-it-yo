@@ -204,7 +204,7 @@ markdown-it-yo/
 ├── src/
 │   ├── main.yo           # CLI entry point
 │   ├── lib.yo            # Library entry point
-│   ├── markdown_it.yo    # Core MarkdownIt class
+│   ├── markdown-it.yo    # Core MarkdownIt class
 │   ├── options.yo        # Configuration presets
 │   ├── token.yo          # Token type definition
 │   ├── ruler.yo          # Rule chain manager

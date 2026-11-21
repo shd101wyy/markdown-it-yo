@@ -2,8 +2,8 @@
 // Ported from: lib/index.mjs (markdown-it v14.1.1) options handling
 
 { String } :: import("std/string");
-{ ArrayList } :: import("std/collections/array_list");
-{ from_code_point } :: import("./common/char_utils.yo");
+{ ArrayList } :: import("std/collections/array-list");
+{ from_code_point } :: import("./common/char-utils.yo");
 
 Options :: struct(
   html : bool,

@@ -7,7 +7,7 @@
 pragma(Pragma.AllowUnsafe);
 { String } :: import("std/string");
 { println, print } :: import("std/fmt");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 { args } :: import("std/env");
 {
   stdin,
@@ -25,7 +25,7 @@ pragma(Pragma.AllowUnsafe);
   FILE
 } :: import("std/libc/stdio");
 
-{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("./markdown_it.yo");
+{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("./markdown-it.yo");
 { Options, default_options, commonmark_options } :: import("./options.yo");
 
 // For Unicode-aware towlower/towupper (used by normalize_reference)
