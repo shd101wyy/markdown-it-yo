@@ -3,9 +3,9 @@
 { String } :: import("std/string");
 { assert } :: import("std/assert");
 { println } :: import("std/fmt");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 { Token } :: import("../src/token.yo");
-{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("../src/markdown_it.yo");
+{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("../src/markdown-it.yo");
 { Options, default_options } :: import("../src/options.yo");
 
 main :: (fn() -> unit)({

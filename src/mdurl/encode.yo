@@ -4,7 +4,7 @@
 
 pragma(Pragma.AllowUnsafe);
 { String } :: import("std/string");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 
 // Characters that are safe in encode_uri (default):
 // ;/?:@&=+$,-_.!~*'()# plus alphanumeric

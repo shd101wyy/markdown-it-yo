@@ -6,7 +6,7 @@
 
 pragma(Pragma.AllowUnsafe);
 { String } :: import("std/string");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 { Token, TokenType, StringPair } :: import("./token.yo");
 { Options } :: import("./options.yo");
 { escape_html, escape_html_to, unescape_all, is_white_space, byte_substring, str_view } :: import("./common/utils.yo");

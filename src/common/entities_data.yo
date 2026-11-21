@@ -1,3 +1,0 @@
-// Re-exports from std/encoding/html_entities
-_m :: import("std/encoding/html_entities");
-export(...(_m));

@@ -1,6 +1,6 @@
 pragma(Pragma.AllowUnsafe);
 { String } :: import("std/string");
-{ ArrayList } :: import("std/collections/array_list");
+{ ArrayList } :: import("std/collections/array-list");
 { Ruler, RuleEntry } :: import("../src/ruler.yo");
 
 // Define a simple function type for testing
